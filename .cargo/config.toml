@@ -18,3 +18,4 @@ lto = "thin"
 # See https://github.com/rust-lang/cargo/issues/3946
 [env]
 CARGO_WORKSPACE_DIR = {value = "", relative = true}
+ELP_EQWALIZER_PATH = "/Users/ilyaklyuchnikov/code/work/eqwalizer/eqwalizer/target/scala-3.6.4/eqwalizer.jar"
