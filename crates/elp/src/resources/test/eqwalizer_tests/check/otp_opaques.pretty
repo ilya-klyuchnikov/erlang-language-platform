@@ -50,13 +50,11 @@ Because in the expression's type:
   Context expects type: #set{} | #{a => []}
   No candidate of the expression's type matches the expected type.
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/otp_opaques.erl:102:13
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/otp_opaques.erl:102:1
     │
 102 │ ts(X, X) -> X.
-    │             ^ X.
-Expression has type:   #set{} | #{a => []}
-Context expected type: T
+    │ ^^^^^^^^^^^^^ Clause is not covered by spec
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/otp_opaques.erl:107:11

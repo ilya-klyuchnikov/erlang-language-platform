@@ -1,27 +1,14 @@
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/refine.erl:12:17
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+   ┌─ check/src/refine.erl:12:1
    │
 12 │ param1(X, X) -> X.
-   │                 ^ X.
-Expression has type:   _B
-Context expected type: none()
+   │ ^^^^^^^^^^^^^^^^^ Clause is not covered by spec
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/refine.erl:16:17
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+   ┌─ check/src/refine.erl:16:1
    │
 16 │ param2(X, X) -> X.
-   │                 ^
-   │                 │
-   │                 X.
-Expression has type:   {B, A}
-Context expected type: {none(), none()}
-   │                 
-
-Because in the expression's type:
-  { 
-    Here the type is:     B
-    Context expects type: none()
-  , A}
+   │ ^^^^^^^^^^^^^^^^^ Clause is not covered by spec
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
    ┌─ check/src/refine.erl:22:15
@@ -31,71 +18,31 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   #{a := atom()}
 Context expected type: none()
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/refine.erl:28:16
-   │
-28 │ funs1(F, F) -> F.
-   │                ^
-   │                │
-   │                F.
-Expression has type:   fun((B | A) -> A)
-Context expected type: fun((A | B) -> none())
-   │                
-
-Because in the expression's type:
-  fun((B | A) ->
-    Here the type is:     A
-    Context expects type: none()
-  )
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/refine.erl:34:16
-   │
-34 │ funs2(F, F) -> F.
-   │                ^
-   │                │
-   │                F.
-Expression has type:   fun((atom() | A) -> A)
-Context expected type: fun((A | atom()) -> none())
-   │                
-
-Because in the expression's type:
-  fun((atom() | A) ->
-    Here the type is:     A
-    Context expects type: none()
-  )
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/refine.erl:84:27
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+   ┌─ check/src/refine.erl:84:1
    │
 84 │ list_trick_neg([X], _) -> X.
-   │                           ^ X.
-Expression has type:   term()
-Context expected type: U
+   │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Clause is not covered by spec
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/refine.erl:92:28
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+   ┌─ check/src/refine.erl:92:1
    │
 92 │ tuple_trick_neg({X}, _) -> X.
-   │                            ^ X.
-Expression has type:   term()
-Context expected type: U
+   │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Clause is not covered by spec
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/refine.erl:101:8
-    │
-101 │     -> X.
-    │        ^ X.
-Expression has type:   _T
-Context expected type: U
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/refine.erl:100:1
+    │  
+100 │ ╭ fun_trick_neg(X, _) when is_function(X, 0)
+101 │ │     -> X.
+    │ ╰────────^ Clause is not covered by spec
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/refine.erl:112:24
-    │
-112 │     (#{key := Val}) -> Val.
-    │                        ^^^ Val.
-Expression has type:   term()
-Context expected type: none()
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/refine.erl:111:1
+    │  
+111 │ ╭ map_refine_tvar_neg
+112 │ │     (#{key := Val}) -> Val.
+    │ ╰──────────────────────────^ Clause is not covered by spec
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/refine.erl:117:26
@@ -114,22 +61,12 @@ Because in the expression's type:
     Context expects type: none()
   , binary()}
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/refine.erl:126:32
-    │
-126 │     (#my_rec{n = N, a = A}) -> {N, A}.
-    │                                ^^^^^^
-    │                                │
-    │                                {N, A}.
-Expression has type:   {number(), atom()}
-Context expected type: {none(), none()}
-    │                                
-
-Because in the expression's type:
-  { 
-    Here the type is:     number()
-    Context expects type: none()
-  , atom()}
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/refine.erl:125:1
+    │  
+125 │ ╭ record_refine_tvar_neg
+126 │ │     (#my_rec{n = N, a = A}) -> {N, A}.
+    │ ╰─────────────────────────────────────^ Clause is not covered by spec
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/refine.erl:139:28
@@ -361,6 +298,18 @@ Because in the expression's type:
     Here the type is:     number()
     Context expects type: atom()
   , atom()}
+
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/refine.erl:266:1
+    │
+266 │ ttt1(T, T) -> T.
+    │ ^^^^^^^^^^^^^^^ Clause is not covered by spec
+
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/refine.erl:274:1
+    │
+274 │ ttt2(T, T) -> T.
+    │ ^^^^^^^^^^^^^^^ Clause is not covered by spec
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/refine.erl:278:21

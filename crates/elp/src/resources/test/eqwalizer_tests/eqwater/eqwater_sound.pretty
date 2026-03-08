@@ -30,28 +30,17 @@ Because in the expression's type:
   However the following candidate: atom()
   Differs from the expected type:  binary()
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ eqwater/src/eqwater_sound.erl:53:28
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+   ┌─ eqwater/src/eqwater_sound.erl:53:1
    │
 53 │ tuple_trick_neg({X}, _) -> X.
-   │                            ^ X.
-Expression has type:   term()
-Context expected type: U
+   │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Clause is not covered by spec
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ eqwater/src/eqwater_sound.erl:57:6
-   │
-57 │   -> X.
-   │      ^ X.
-Expression has type:   _T
-Context expected type: U
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+   ┌─ eqwater/src/eqwater_sound.erl:56:1
+   │  
+56 │ ╭ fun_trick_neg(X, _) when is_function(X, 0)
+57 │ │   -> X.
+   │ ╰──────^ Clause is not covered by spec
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ eqwater/src/eqwater_sound.erl:60:24
-   │
-60 │ union_trick(_, {B}) -> B.
-   │                        ^ B.
-Expression has type:   term()
-Context expected type: B
-
-5 ERRORS
+4 ERRORS

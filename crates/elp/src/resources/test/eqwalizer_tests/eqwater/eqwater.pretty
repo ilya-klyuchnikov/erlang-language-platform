@@ -220,22 +220,6 @@ Because in the expression's type:
   Differs from the expected type:  #b{}
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ eqwater/src/eqwater.erl:631:27
-    │
-631 │ occ23_neg({_, B}, F) -> F(B).
-    │                           ^
-    │                           │
-    │                           B.
-Expression has type:   A | B
-Context expected type: B
-    │                           
-
-Because in the expression's type:
-  Here the type is a union type with some valid candidates: B
-  However the following candidate: A
-  Differs from the expected type:  B
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ eqwater/src/eqwater.erl:649:17
     │
 649 │ occ26_neg(T) -> T.
@@ -495,4 +479,4 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   fun((term(), term()) -> term())
 Context expected type: 'ok'
 
-38 ERRORS
+37 ERRORS

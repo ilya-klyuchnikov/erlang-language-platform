@@ -39,22 +39,6 @@ Expression has type:   {fun((dynamic()) -> dynamic())}
 Context expected type: fun(('a') -> 'b') | fun(('a') -> 'c')
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/overloaded.erl:198:37
-    │
-198 │ overlap_neg_1(X) when is_atom(X) -> 1;
-    │                                     ^ 1.
-Expression has type:   number()
-Context expected type: {T}
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/overloaded.erl:203:37
-    │
-203 │ overlap_neg_2(X) when is_atom(X) -> 1;
-    │                                     ^ 1.
-Expression has type:   number()
-Context expected type: {T}
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/overloaded.erl:204:22
     │
 204 │ overlap_neg_2(_X) -> 1.
@@ -131,4 +115,4 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   'b'
 Context expected type: 'a'
 
-15 ERRORS
+13 ERRORS

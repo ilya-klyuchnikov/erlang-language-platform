@@ -1,18 +1,21 @@
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/parametricity.erl:178:19
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/parametricity.erl:178:1
     │
 178 │ refine01(X, X) -> X.
-    │                   ^ X.
-Expression has type:   _B
-Context expected type: A
+    │ ^^^^^^^^^^^^^^^^^^^ Clause is not covered by spec
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/parametricity.erl:186:22
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/parametricity.erl:181:1
     │
-186 │     [Elem || Elem <- X].
-    │                      ^ X.
-Expression has type:   B
-Context expected type: [term()]
+181 │ refine02(X, X) -> X.
+    │ ^^^^^^^^^^^^^^^^^^^ Clause is not covered by spec
+
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/parametricity.erl:185:1
+    │  
+185 │ ╭ refine03(X, X, _) ->
+186 │ │     [Elem || Elem <- X].
+    │ ╰───────────────────────^ Clause is not covered by spec
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/parametricity.erl:218:3
@@ -37,14 +40,6 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
     │   ^^^^^^^^^^^^^^^ select(T, 0, 0).
 Expression has type:   number()
 Context expected type: binary()
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/parametricity.erl:229:31
-    │
-229 │ unwrap(undefined, Default) -> Default;
-    │                               ^^^^^^^ Default.
-Expression has type:   term()
-Context expected type: Value
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/parametricity.erl:241:22

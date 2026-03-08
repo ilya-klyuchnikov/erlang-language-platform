@@ -54,14 +54,6 @@ Because in the expression's type:
   Context expects type: 'wrong_ret'
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generics_with_unions.erl:217:19
-    │
-217 │ overlap_1([T]) -> T;
-    │                   ^ T.
-Expression has type:   term()
-Context expected type: T
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/generics_with_unions.erl:218:17
     │
 218 │ overlap_1(T) -> T.
@@ -94,36 +86,12 @@ Because in the expression's type:
   Differs from the expected type:  T
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generics_with_unions.erl:222:19
-    │
-222 │ overlap_2([T]) -> T.
-    │                   ^ T.
-Expression has type:   term()
-Context expected type: T
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/generics_with_unions.erl:230:5
     │
 230 │     overlap_2([ok]).
     │     ^^^^^^^^^^^^^^^ overlap_2(['ok']).
 Expression has type:   'ok'
 Context expected type: ['ok']
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generics_with_unions.erl:233:18
-    │
-233 │ trick(_, {B}) -> B.
-    │                  ^ B.
-Expression has type:   term()
-Context expected type: B
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generics_with_unions.erl:256:5
-    │
-256 │     Default;
-    │     ^^^^^^^ Default.
-Expression has type:   term()
-Context expected type: Value
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/generics_with_unions.erl:328:29
@@ -189,4 +157,4 @@ Because in the expression's type:
     }
   ) -> 'ok')
 
-16 ERRORS
+12 ERRORS

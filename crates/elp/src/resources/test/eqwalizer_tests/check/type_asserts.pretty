@@ -178,11 +178,25 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   'a'
 Context expected type: number()
 
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/type_asserts.erl:162:1
+    │  
+162 │ ╭ vars_in_cast1_neg(T) when is_atom(T) ->
+163 │ │   ?checked_cast(ok, A).
+    │ ╰──────────────────────^ Clause is not covered by spec
+
 error: variables_in_type_cast (See https://fb.me/eqwalizer_errors#variables_in_type_cast)
     ┌─ check/src/type_asserts.erl:163:21
     │
 163 │   ?checked_cast(ok, A).
     │                     ^ type variables are not allowed in type casts, found: A
+
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/type_asserts.erl:166:1
+    │  
+166 │ ╭ vars_in_cast2_neg(T) when is_atom(T) ->
+167 │ │   ?unchecked_cast(ok, A | B).
+    │ ╰────────────────────────────^ Clause is not covered by spec
 
 error: variables_in_type_cast (See https://fb.me/eqwalizer_errors#variables_in_type_cast)
     ┌─ check/src/type_asserts.erl:167:23
@@ -196,4 +210,4 @@ error: refined_record_in_type_cast (See https://fb.me/eqwalizer_errors#refined_r
 173 │   ?unchecked_cast(1, #rec{bad_field :: atom()}).
     │                      ^^^^^^^^^^^^^^^^^^^^^^^^^ refined records are not allowed in type casts, found: rec
 
-19 ERRORS
+21 ERRORS
