@@ -141,8 +141,10 @@ fn he_by_coupling(s: &Type, t: &Type) -> bool {
             true
         }
         (Type::RefinedRecordType(_), _) => false,
-        (Type::VarType(vt1), Type::VarType(vt2)) if vt1 == vt2 => true,
-        (Type::VarType(_), _) => false,
+        (Type::BoundVar(bv1), Type::BoundVar(bv2)) if bv1 == bv2 => true,
+        (Type::BoundVar(_), _) => false,
+        (Type::FreeVar(fv1), Type::FreeVar(fv2)) if fv1 == fv2 => true,
+        (Type::FreeVar(_), _) => false,
         (s, t) => s == t,
     }
 }
@@ -189,7 +191,7 @@ impl StubContractivityChecker<'_> {
         let id = t.id.clone().into_remote(self.module);
         let rty = RemoteType {
             id: id.clone(),
-            arg_tys: t.params.iter().cloned().map(Type::VarType).collect(),
+            arg_tys: t.params.iter().cloned().map(Type::BoundVar).collect(),
         };
         assert!(self.history.is_empty());
         assert!(self.productive.is_empty());
@@ -323,7 +325,7 @@ impl StubContractivityChecker<'_> {
                 decl.body.clone()
             } else {
                 let sub: FxHashMap<u32, &Type> =
-                    decl.params.iter().map(|v| v.n).zip(args).collect();
+                    decl.params.iter().map(|v| v.i).zip(args).collect();
                 Subst { sub }.apply(decl.body.clone())
             }
         }

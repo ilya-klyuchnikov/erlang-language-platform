@@ -41,7 +41,7 @@ use elp_types_db::eqwalizer::types::RemoteType;
 use elp_types_db::eqwalizer::types::TupleType;
 use elp_types_db::eqwalizer::types::Type;
 use elp_types_db::eqwalizer::types::UnionType;
-use elp_types_db::eqwalizer::types::VarType;
+use elp_types_db::eqwalizer::types::BoundVar;
 use fxhash::FxHashMap;
 use indexmap::IndexSet;
 
@@ -207,11 +207,11 @@ impl TypeConverter {
             .collect()
     }
 
-    fn collect_vars(&self, vars: &[StringId]) -> Vec<VarType> {
+    fn collect_vars(&self, vars: &[StringId]) -> Vec<BoundVar> {
         vars.iter()
             .enumerate()
-            .map(|(n, name)| VarType {
-                n: n as u32,
+            .map(|(n, name)| BoundVar {
+                i: n as u32,
                 name: *name,
             })
             .collect()
@@ -298,8 +298,8 @@ impl TypeConverter {
                 .convert_types(sub, ty.args)?
                 .map(|arg_tys| Type::RemoteType(RemoteType { id: ty.id, arg_tys }))),
             ExtType::VarExtType(var) => match sub.get(&var.name) {
-                Some(id) => Ok(Ok(Type::VarType(VarType {
-                    n: *id,
+                Some(id) => Ok(Ok(Type::BoundVar(BoundVar {
+                    i: *id,
                     name: var.name,
                 }))),
                 None if self.in_rec_decl => {
