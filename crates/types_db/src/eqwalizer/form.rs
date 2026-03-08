@@ -18,8 +18,6 @@ use crate::eqwalizer::expr;
 use crate::eqwalizer::ext_types;
 use crate::eqwalizer::types::FunType;
 use crate::eqwalizer::types::Type;
-use crate::eqwalizer::types::BoundVar;
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ExternalForm {
     Module(ModuleAttr),
@@ -166,7 +164,7 @@ pub struct TypeDecl {
     pub pos: eqwalizer::Pos,
     pub id: eqwalizer::Id,
     #[serde(default)]
-    pub params: Vec<BoundVar>,
+    pub params: Vec<StringId>,
     pub body: Type,
 }
 

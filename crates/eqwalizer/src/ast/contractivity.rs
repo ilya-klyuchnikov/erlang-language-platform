@@ -191,7 +191,17 @@ impl StubContractivityChecker<'_> {
         let id = t.id.clone().into_remote(self.module);
         let rty = RemoteType {
             id: id.clone(),
-            arg_tys: t.params.iter().cloned().map(Type::BoundVar).collect(),
+            arg_tys: t
+                .params
+                .iter()
+                .enumerate()
+                .map(|(i, name)| {
+                    Type::BoundVar(elp_types_db::eqwalizer::types::BoundVar {
+                        i: i as u32,
+                        name: *name,
+                    })
+                })
+                .collect(),
         };
         assert!(self.history.is_empty());
         assert!(self.productive.is_empty());
@@ -325,7 +335,7 @@ impl StubContractivityChecker<'_> {
                 decl.body.clone()
             } else {
                 let sub: FxHashMap<u32, &Type> =
-                    decl.params.iter().map(|v| v.i).zip(args).collect();
+                    (0..decl.params.len() as u32).zip(args).collect();
                 Subst { sub }.apply(decl.body.clone())
             }
         }

@@ -188,13 +188,12 @@ impl TypeConverter {
         decl: ExternalTypeDecl,
     ) -> Result<TypeDecl, TypeConversionError> {
         let sub = self.collect_substitution(&decl.params);
-        let params = self.collect_vars(&decl.params);
         let result = self.convert_type(&sub, decl.body)?;
         // Invalid declarations should only appear when converting record declarations
         let body = result.map_err(TypeConversionError::ErrorInTypeDecl)?;
         Ok(TypeDecl {
             id: decl.id,
-            params,
+            params: decl.params,
             body,
             pos: decl.pos,
         })
@@ -204,16 +203,6 @@ impl TypeConverter {
         vars.iter()
             .enumerate()
             .map(|(n, name)| (*name, n as u32))
-            .collect()
-    }
-
-    fn collect_vars(&self, vars: &[StringId]) -> Vec<BoundVar> {
-        vars.iter()
-            .enumerate()
-            .map(|(n, name)| BoundVar {
-                i: n as u32,
-                name: *name,
-            })
             .collect()
     }
 
