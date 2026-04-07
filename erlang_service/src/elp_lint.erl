@@ -312,7 +312,8 @@ format_error({removed_type, MNA, String}) ->
 format_error({removed_callback, MNA, String}) ->
     io_lib:format("the callback ~s is removed; ~s", [format_mna(MNA), String]);
 format_error({obsolete_guard, {F, A}}) ->
-    io_lib:format("~p/~p obsolete (use is_~p/~p)", [F, A, F, A]);
+    io_lib:format("~p/~p as a type test is obsolete and will be "
+                  "removed in OTP 30; use is_~p/~p instead", [F, A, F, A]);
 format_error({obsolete_guard_overridden,Test}) ->
     io_lib:format("obsolete ~s/1 (meaning is_~s/1) is illegal when "
 		  "there is a local/imported function named is_~p/1 ",
