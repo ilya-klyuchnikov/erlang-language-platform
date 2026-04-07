@@ -302,6 +302,11 @@ format_error({deprecated_callback, {M1, F1, A1}, String, Rel}) ->
 format_error({deprecated_callback, {M1, F1, A1}, String}) when is_list(String) ->
     io_lib:format("the callback ~p:~p~s is deprecated; ~s",
                   [M1, F1, gen_type_paren(A1), String]);
+format_error(deprecated_catch) ->
+    "'catch ...' is deprecated; please use "
+    "'try ... catch ... end' instead. "
+    "Compile directive 'nowarn_deprecated_catch' can be used to suppress "
+    "warnings in selected modules.";
 format_error({removed, MFA, ReplacementMFA, Rel}) ->
     io_lib:format("call to ~s will fail, since it was removed in ~s; "
 		  "use ~s", [format_mfa(MFA), Rel, format_mfa(ReplacementMFA)]);
@@ -664,6 +669,9 @@ start(File, Opts) ->
 		      true, Opts)},
 	 {deprecated_callback,
 	  bool_option(warn_deprecated_callback, nowarn_deprecated_callback,
+		      true, Opts)},
+	 {deprecated_catch,
+	  bool_option(warn_deprecated_catch, nowarn_deprecated_catch,
 		      true, Opts)},
          {obsolete_guard,
           bool_option(warn_obsolete_guard, nowarn_obsolete_guard,
@@ -2533,7 +2541,11 @@ expr({'try',Anno,Es,Scs,Ccs,As}, Vt, St0) ->
 expr({'catch',Anno,E}, Vt, St0) ->
     %% No new variables added, flag new variables as unsafe.
     {Evt,St} = expr(E, Vt, St0),
-    {vtupdate(vtunsafe({'catch',Anno}, Evt, Vt), Evt),St};
+    St1 = case is_warn_enabled(deprecated_catch, St) of
+              true -> add_warning(Anno, deprecated_catch, St);
+              false -> St
+          end,
+    {vtupdate(vtunsafe({'catch',Anno}, Evt, Vt), Evt),St1};
 expr({match,_Anno,P,E}, Vt, St0) ->
     {Evt,St1} = expr(E, Vt, St0),
     {Pvt,Pnew,St} = pattern(P, vtupdate(Evt, Vt), St1),
