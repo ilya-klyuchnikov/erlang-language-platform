@@ -171,6 +171,9 @@ fn try_main(cli: &mut dyn Cli, mut args: Args) -> Result<()> {
         args::Command::EqwalizeStats(args) => {
             eqwalizer_cli::eqwalize_stats(args, cli, &query_config, ifdef)?
         }
+        args::Command::EqwalizeTarget(eqwalize_target_args) if eqwalize_target_args.connect => {
+            daemon::connect_eqwalize_target(eqwalize_target_args, cli)?
+        }
         args::Command::EqwalizeTarget(args) => {
             eqwalizer_cli::eqwalize_target(args, cli, &query_config, ifdef)?
         }

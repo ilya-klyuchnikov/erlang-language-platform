@@ -41,6 +41,7 @@ use serde::Deserialize;
 use crate::args::Eqwalize;
 use crate::args::EqwalizeAll;
 use crate::args::EqwalizeApp;
+use crate::args::EqwalizeTarget;
 use crate::args::Shell;
 use crate::eqwalizer_cli;
 
@@ -127,6 +128,7 @@ pub(crate) enum ShellCommand {
     ShellEqwalize(Eqwalize),
     ShellEqwalizeAll(EqwalizeAll),
     ShellEqwalizeApp(EqwalizeApp),
+    ShellEqwalizeTarget(EqwalizeTarget),
     Help,
     Quit,
 }
@@ -215,6 +217,31 @@ impl ShellCommand {
                         list_modules: false,
                     })));
                 }
+                "eqwalize-target" => {
+                    if let [option, ..] = options[..] {
+                        return Err(ShellError::UnexpectedOption(
+                            "eqwalize-target".into(),
+                            option.into(),
+                        ));
+                    }
+                    if let [_, arg, ..] = args[..] {
+                        return Err(ShellError::UnexpectedArg(
+                            "eqwalize-target".into(),
+                            arg.into(),
+                        ));
+                    }
+                    if let [target] = args[..] {
+                        return Ok(Some(ShellCommand::ShellEqwalizeTarget(EqwalizeTarget {
+                            project,
+                            format: None,
+                            include_generated: false,
+                            connect: false,
+                            bail_on_error: false,
+                            target: target.into(),
+                        })));
+                    }
+                    return Err(ShellError::MissingArg("eqwalize-target".into()));
+                }
                 "exit" | "quit" => return Ok(Some(ShellCommand::Quit)),
                 s => return Err(ShellError::UnexpectedCommand(s.into())),
             }
@@ -234,6 +261,7 @@ COMMANDS:
         --clause-coverage      Use experimental clause coverage checker
     eqwalize-app <app>         Eqwalize all modules in specified application
         --clause-coverage      Use experimental clause coverage checker
+    eqwalize-target <target>   Eqwalize all modules in specified buck target
 ";
 
 pub const WELCOME: &str = "\
@@ -441,6 +469,11 @@ fn execute_line(
         }
         Ok(Some(ShellCommand::ShellEqwalizeAll(eqwalize_all))) => {
             eqwalizer_cli::do_eqwalize_all(&eqwalize_all, loaded, cli)
+                .or_else(|e| writeln!(cli, "Error: {e}"))?;
+            Ok(ControlFlow::Continue(()))
+        }
+        Ok(Some(ShellCommand::ShellEqwalizeTarget(eqwalize_target))) => {
+            eqwalizer_cli::do_eqwalize_target(&eqwalize_target, loaded, cli)
                 .or_else(|e| writeln!(cli, "Error: {e}"))?;
             Ok(ControlFlow::Continue(()))
         }

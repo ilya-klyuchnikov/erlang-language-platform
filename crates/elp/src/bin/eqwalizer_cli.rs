@@ -324,9 +324,18 @@ pub fn eqwalize_target(
         ifdef,
     )?;
 
-    set_eqwalizer_config(&mut loaded);
     telemetry::report_elapsed_time("eqwalize-target operational", start_time);
+    let r = do_eqwalize_target(args, &mut loaded, cli);
+    telemetry::report_elapsed_time("eqwalize-target done", start_time);
+    r
+}
 
+pub fn do_eqwalize_target(
+    args: &EqwalizeTarget,
+    loaded: &mut LoadResult,
+    cli: &mut dyn Cli,
+) -> Result<()> {
+    set_eqwalizer_config(loaded);
     let buck = match &loaded.project.project_build_data {
         ProjectBuildData::Buck(buck) => buck,
         _ => bail!("only buck project supported"),
@@ -380,18 +389,28 @@ elp eqwalize-target erl/chatd #same as //erl/chatd/... but enables shell complet
         _ => (),
     };
 
-    let mut reporter = reporting::PrettyReporter::new(analysis, &loaded, cli);
+    let mut json_reporter;
+    let mut pretty_reporter;
+
+    let reporter: &mut dyn Reporter = match args.format {
+        None => {
+            pretty_reporter = reporting::PrettyReporter::new(analysis, loaded, cli);
+            &mut pretty_reporter
+        }
+        Some(_) => {
+            json_reporter = reporting::JsonReporter::new(analysis, loaded, cli);
+            &mut json_reporter
+        }
+    };
     let bail_on_error = args.bail_on_error;
 
-    let r = eqwalize(EqwalizerInternalArgs {
+    eqwalize(EqwalizerInternalArgs {
         analysis,
-        loaded: &loaded,
+        loaded,
         file_ids,
-        reporter: &mut reporter,
+        reporter,
         bail_on_error,
-    });
-    telemetry::report_elapsed_time("eqwalize-target done", start_time);
-    r
+    })
 }
 
 pub fn eqwalize_stats(

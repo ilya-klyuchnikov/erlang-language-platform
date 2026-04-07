@@ -56,6 +56,7 @@ use crate::args::DaemonRun;
 use crate::args::Eqwalize;
 use crate::args::EqwalizeAll;
 use crate::args::EqwalizeApp;
+use crate::args::EqwalizeTarget;
 use crate::args::Shell;
 use crate::eqwalizer_cli;
 use crate::shell::ShellCommand;
@@ -459,6 +460,18 @@ fn handle_connection(
             };
             (done, false)
         }
+        Ok(Some(ShellCommand::ShellEqwalizeTarget(mut eqwalize_target))) => {
+            eqwalize_target.format = Some("json".to_string());
+            let done = match eqwalizer_cli::do_eqwalize_target(
+                &eqwalize_target,
+                loaded,
+                &mut socket_cli,
+            ) {
+                Ok(()) => DoneMessage::ok(),
+                Err(e) => DoneMessage::error(e.to_string()),
+            };
+            (done, false)
+        }
         Err(err) => (DoneMessage::error(err.to_string()), false),
     };
 
@@ -662,6 +675,13 @@ pub fn connect_eqwalize_app(args: &EqwalizeApp, cli: &mut dyn Cli) -> Result<()>
         format_json,
         cli,
     )
+}
+
+pub fn connect_eqwalize_target(args: &EqwalizeTarget, cli: &mut dyn Cli) -> Result<()> {
+    let cmd = format!("eqwalize-target {}", args.target);
+    let format_json = args.format.is_some();
+    // eqwalize-target is buck-only, so profile is always "test" and rebar is always false
+    connect_and_run(&cmd, &args.project, "test", false, format_json, cli)
 }
 
 // ---------------------------------------------------------------------------

@@ -172,9 +172,19 @@ pub struct EqwalizeTarget {
     /// Path to directory with project, or to a JSON file (defaults to `.`)
     #[bpaf(argument("PROJECT"), fallback(PathBuf::from(".")))]
     pub project: PathBuf,
+    /// Show diagnostics in JSON format
+    #[bpaf(
+        argument("FORMAT"),
+        complete(format_completer),
+        fallback(None),
+        guard(format_guard, "Please use json")
+    )]
+    pub format: Option<String>,
     /// Also eqwalize opted-in generated modules from application (deprecated)
     #[bpaf(hide)]
     pub include_generated: bool,
+    /// Use a persistent daemon for fast turnaround (auto-starts if needed)
+    pub connect: bool,
     /// Exit with a non-zero status code if any errors are found
     pub bail_on_error: bool,
     /// target, like //erl/chatd/...
