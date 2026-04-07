@@ -47,9 +47,6 @@ use elp_ide::elp_ide_db::elp_base_db::IncludeOtp;
 use elp_ide::elp_ide_db::elp_base_db::ProjectApps;
 use elp_ide::elp_ide_db::elp_base_db::ProjectId;
 use elp_ide::elp_ide_db::elp_base_db::SourceDatabase;
-use elp_ide::elp_ide_db::elp_base_db::SourceDatabaseExt;
-use elp_ide::elp_ide_db::elp_base_db::SourceRoot;
-use elp_ide::elp_ide_db::elp_base_db::SourceRootId;
 use elp_ide::elp_ide_db::elp_base_db::Vfs;
 use elp_ide::elp_ide_db::elp_base_db::VfsPath;
 use elp_ide::elp_ide_db::elp_base_db::loader;
@@ -1090,26 +1087,18 @@ impl Server {
         // sure all calculations see a consistent view of the
         // database.
 
+        // Apply text changes (shared with watchman and CLI)
+        let mut lem = self.line_ending_map.write();
+        crate::reload::apply_vfs_text_changes(raw_database, vfs, changed_files.values(), &mut lem);
+        drop(lem);
+
+        // Server-specific per-file processing
         let mut highest_file_id: u32 = 0;
         for (_, file) in &changed_files {
             highest_file_id = highest_file_id.max(file.file_id.index());
             let file_exists = vfs.exists(file.file_id);
 
             if file.change != vfs::Change::Delete && file_exists {
-                // Temporary for T183487471
-                let _pctx = stdx::panic_context::enter(format!(
-                    "\nserver::process_changes_to_vfs_store:{:?}:{:?}",
-                    &file.file_id, &file.change
-                ));
-                if let vfs::Change::Create(v, _) | vfs::Change::Modify(v, _) = &file.change {
-                    let document = Document::from_bytes(v);
-                    let (text, line_endings) = document.vfs_to_salsa();
-                    raw_database.set_file_text(file.file_id, Arc::from(text));
-                    self.line_ending_map
-                        .write()
-                        .insert(file.file_id, line_endings);
-                }
-
                 if self.initial_load_status == InitialLoading::Done
                     && let vfs::Change::Create(_, _) = &file.change
                     && let Some(path) = vfs.file_path(file.file_id).as_path()
@@ -1137,10 +1126,7 @@ impl Server {
                 Arc::make_mut(&mut self.diagnostics)
                     .set_erlang_service(file.file_id, LabeledDiagnostics::default());
                 Arc::make_mut(&mut self.diagnostics).set_ct(file.file_id, vec![]);
-            } else {
-                // We can't actually delete things from salsa, just set it to empty
-                raw_database.set_file_text(file.file_id, Arc::from(""));
-            };
+            }
         }
         if self.initial_load_status == InitialLoading::DoneButVfsChanges {
             self.initial_load_status = InitialLoading::Done;
@@ -1177,15 +1163,7 @@ impl Server {
                 .into_values()
                 .any(|file| file.is_created_or_deleted())
         {
-            let sets = self.file_set_config.partition(vfs);
-            for (idx, set) in sets.into_iter().enumerate() {
-                let root_id = SourceRootId(idx as u32);
-                for file_id in set.iter() {
-                    raw_database.set_file_source_root(file_id, root_id);
-                }
-                let root = SourceRoot::new(set);
-                raw_database.set_source_root(root_id, Arc::new(root));
-            }
+            crate::reload::apply_source_roots(raw_database, vfs, &self.file_set_config);
             self.reset_source_roots = false;
         }
 

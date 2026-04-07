@@ -12,7 +12,6 @@
 //! without support for incorporating changes
 use std::fs;
 use std::path::Path;
-use std::sync::Arc;
 
 use anyhow::Result;
 use crossbeam_channel::Receiver;
@@ -25,9 +24,6 @@ use elp_ide::elp_ide_db::elp_base_db::IncludeOtp;
 use elp_ide::elp_ide_db::elp_base_db::ProjectApps;
 use elp_ide::elp_ide_db::elp_base_db::ProjectId;
 use elp_ide::elp_ide_db::elp_base_db::SourceDatabase;
-use elp_ide::elp_ide_db::elp_base_db::SourceDatabaseExt;
-use elp_ide::elp_ide_db::elp_base_db::SourceRoot;
-use elp_ide::elp_ide_db::elp_base_db::SourceRootId;
 use elp_ide::elp_ide_db::elp_base_db::Vfs;
 use elp_ide::elp_ide_db::elp_base_db::loader;
 use elp_ide::elp_ide_db::elp_base_db::loader::Handle;
@@ -43,9 +39,10 @@ use vfs::loader::LoadingProgress;
 
 use crate::build::types::LoadResult;
 use crate::cli::Cli;
-use crate::document::Document;
 use crate::line_endings::LineEndings;
 use crate::reload::ProjectFolders;
+use crate::reload::apply_source_roots;
+use crate::reload::apply_vfs_text_changes;
 
 /// Discover the project manifest by walking upward from the given path.
 /// This is the shared discovery logic used by both `load_project_at` and
@@ -210,31 +207,14 @@ fn load_database(
 
     let pb = cli.spinner("Seeding database");
 
-    let sets = file_set_config.partition(vfs);
-    for (idx, set) in sets.into_iter().enumerate() {
-        let root_id = SourceRootId(idx as u32);
-        for file_id in set.iter() {
-            db.set_file_source_root(file_id, root_id);
-        }
-        let root = SourceRoot::new(set);
-        db.set_source_root(root_id, Arc::new(root));
-    }
+    apply_source_roots(db, vfs, file_set_config);
 
     project_apps.app_structure().apply(db, &|path| {
         vfs.file_id(&VfsPath::from(path.clone())).map(|(id, _)| id)
     });
 
-    let changes = vfs.take_changes();
-    for (_file_id, file) in changes {
-        if file.exists()
-            && let vfs::Change::Create(v, _) | vfs::Change::Modify(v, _) = file.change
-        {
-            let document = Document::from_bytes(&v);
-            let (text, line_ending) = document.vfs_to_salsa();
-            db.set_file_text(file.file_id, Arc::from(text));
-            line_ending_map.insert(file.file_id, line_ending);
-        }
-    }
+    let changed_files = vfs.take_changes();
+    apply_vfs_text_changes(db, vfs, changed_files.values(), line_ending_map);
 
     pb.finish();
 

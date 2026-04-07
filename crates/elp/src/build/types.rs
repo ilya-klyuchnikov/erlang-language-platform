@@ -22,6 +22,8 @@ use indicatif::ProgressBar;
 use itertools::Itertools;
 
 use crate::line_endings::LineEndings;
+use crate::reload::apply_source_roots;
+use crate::reload::apply_vfs_text_changes;
 
 #[derive(Debug)]
 pub struct LoadResult {
@@ -97,6 +99,27 @@ impl LoadResult {
             .set_eqwalizer_progress_reporter(None);
 
         r
+    }
+
+    pub fn apply_vfs_changes(&mut self) -> bool {
+        let changed_files = self.vfs.take_changes();
+        if changed_files.is_empty() {
+            return false;
+        }
+        let db = self.analysis_host.raw_database_mut();
+        apply_vfs_text_changes(
+            db,
+            &self.vfs,
+            changed_files.values(),
+            &mut self.line_ending_map,
+        );
+        if changed_files
+            .into_values()
+            .any(|f| f.is_created_or_deleted())
+        {
+            apply_source_roots(db, &self.vfs, &self.file_set_config);
+        }
+        true
     }
 
     pub fn analysis(&self) -> Analysis {

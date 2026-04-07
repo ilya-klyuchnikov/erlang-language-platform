@@ -13,20 +13,14 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
-use std::sync::Arc;
 
 use anyhow::Result;
 use elp_ide::elp_ide_db::elp_base_db::AbsPathBuf;
-use elp_ide::elp_ide_db::elp_base_db::SourceDatabase;
-use elp_ide::elp_ide_db::elp_base_db::SourceDatabaseExt;
-use elp_ide::elp_ide_db::elp_base_db::SourceRoot;
-use elp_ide::elp_ide_db::elp_base_db::SourceRootId;
 use elp_ide::elp_ide_db::elp_base_db::VfsPath;
 use paths::Utf8PathBuf;
 use serde::Deserialize;
 
 use crate::build::types::LoadResult;
-use crate::document::Document;
 
 pub struct Watchman {
     watch: PathBuf,
@@ -150,7 +144,7 @@ impl Watchman {
                 }
             }
         }
-        process_changes_to_vfs_store(loaded);
+        loaded.apply_vfs_changes();
 
         self.clock = result.clock;
         Ok(UpdateResult::Updated)
@@ -263,45 +257,4 @@ fn is_config_file(name: &str) -> bool {
 
 fn is_suite_file(name: &str) -> bool {
     name.ends_with("_SUITE.erl")
-}
-
-pub(crate) fn process_changes_to_vfs_store(loaded: &mut LoadResult) -> bool {
-    let changed_files = loaded.vfs.take_changes();
-
-    if changed_files.is_empty() {
-        return false;
-    }
-
-    let raw_database = loaded.analysis_host.raw_database_mut();
-
-    for (_, file) in &changed_files {
-        let file_exists = loaded.vfs.exists(file.file_id);
-        if file.change != vfs::Change::Delete && file_exists {
-            if let vfs::Change::Create(v, _) | vfs::Change::Modify(v, _) = &file.change {
-                let document = Document::from_bytes(v);
-                let (text, line_ending) = document.vfs_to_salsa();
-                raw_database.set_file_text(file.file_id, Arc::from(text));
-                loaded.line_ending_map.insert(file.file_id, line_ending);
-            } else {
-                raw_database.set_file_text(file.file_id, Arc::from(""));
-            };
-        }
-    }
-
-    if changed_files
-        .into_values()
-        .any(|file| file.is_created_or_deleted())
-    {
-        let sets = loaded.file_set_config.partition(&loaded.vfs);
-        for (idx, set) in sets.into_iter().enumerate() {
-            let root_id = SourceRootId(idx as u32);
-            for file_id in set.iter() {
-                raw_database.set_file_source_root(file_id, root_id);
-            }
-            let root = SourceRoot::new(set);
-            raw_database.set_source_root(root_id, Arc::new(root));
-        }
-    }
-
-    true
 }

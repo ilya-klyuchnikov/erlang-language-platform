@@ -9,15 +9,28 @@
  */
 
 use std::cmp;
+use std::sync::Arc;
 
+use elp_ide::elp_ide_db::RootDatabase;
 use elp_ide::elp_ide_db::elp_base_db::FileSetConfig;
 use elp_ide::elp_ide_db::elp_base_db::ProjectApps;
 use elp_ide::elp_ide_db::elp_base_db::ProjectId;
+use elp_ide::elp_ide_db::elp_base_db::SourceDatabase;
+use elp_ide::elp_ide_db::elp_base_db::SourceDatabaseExt;
+use elp_ide::elp_ide_db::elp_base_db::SourceRoot;
+use elp_ide::elp_ide_db::elp_base_db::SourceRootId;
+use elp_ide::elp_ide_db::elp_base_db::Vfs;
 use elp_ide::elp_ide_db::elp_base_db::VfsPath;
 use elp_ide::elp_ide_db::elp_base_db::loader;
 use elp_project_model::ProjectAppData;
+use fxhash::FxHashMap;
 use fxhash::FxHashSet;
 use vfs::AbsPathBuf;
+use vfs::ChangedFile;
+use vfs::FileId;
+
+use crate::document::Document;
+use crate::line_endings::LineEndings;
 
 #[derive(Debug)]
 pub struct ProjectFolders {
@@ -167,4 +180,36 @@ fn loader_config(project_apps: &ProjectApps<'_>) -> Vec<loader::Entry> {
     // correlation though.
     load.push(loader::Entry::Files(files.into_iter().collect()));
     load
+}
+
+pub fn apply_vfs_text_changes<'a>(
+    db: &mut RootDatabase,
+    vfs: &Vfs,
+    changed_files: impl IntoIterator<Item = &'a ChangedFile>,
+    line_ending_map: &mut FxHashMap<FileId, LineEndings>,
+) {
+    for file in changed_files {
+        if file.change != vfs::Change::Delete && vfs.exists(file.file_id) {
+            if let vfs::Change::Create(v, _) | vfs::Change::Modify(v, _) = &file.change {
+                let document = Document::from_bytes(v);
+                let (text, line_ending) = document.vfs_to_salsa();
+                db.set_file_text(file.file_id, Arc::from(text));
+                line_ending_map.insert(file.file_id, line_ending);
+            }
+        } else {
+            db.set_file_text(file.file_id, Arc::from(""));
+        }
+    }
+}
+
+pub fn apply_source_roots(db: &mut RootDatabase, vfs: &Vfs, file_set_config: &FileSetConfig) {
+    let sets = file_set_config.partition(vfs);
+    for (idx, set) in sets.into_iter().enumerate() {
+        let root_id = SourceRootId(idx as u32);
+        for file_id in set.iter() {
+            db.set_file_source_root(file_id, root_id);
+        }
+        let root = SourceRoot::new(set);
+        db.set_source_root(root_id, Arc::new(root));
+    }
 }
