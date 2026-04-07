@@ -41,10 +41,8 @@ use codespan_reporting::term::termcolor::WriteColor;
 use elp::build::load;
 use elp::build::types::LoadResult;
 use elp::cli::Cli;
+use elp::watchman::UpdateResult;
 use elp::watchman::Watchman;
-use elp::watchman::WatchmanClock;
-use elp::watchman::should_reload_project;
-use elp::watchman::update_changes;
 use elp_eqwalizer::Mode;
 use elp_ide::elp_ide_db::elp_base_db::IncludeOtp;
 use elp_log::telemetry;
@@ -264,12 +262,7 @@ fn run_daemon_server(
     fs::write(&version_file, elp::version())?;
 
     // Load project from already-discovered manifest (no re-discovery)
-    let watchman = Watchman::new(&root).map_err(|_err| {
-        anyhow::Error::msg(
-            "Could not find project. Are you in an Erlang project directory, \
-             or is one specified using --project?",
-        )
-    })?;
+    let mut watchman = Watchman::new(&root)?;
     let mut loaded = load::load_project_from_manifest(
         cli,
         &manifest,
@@ -279,7 +272,7 @@ fn run_daemon_server(
         query_config,
         ifdef,
     )?;
-    let mut last_read = watchman.get_clock()?;
+    watchman.set_project_dirs(&loaded);
     telemetry::report_elapsed_time("daemon operational", start_time);
 
     eprintln!("[elp-daemon] Ready, listening on {}", sock.display());
@@ -326,8 +319,7 @@ fn run_daemon_server(
                     stream,
                     &root,
                     &mut loaded,
-                    &watchman,
-                    &mut last_read,
+                    &mut watchman,
                     &manifest,
                     &elp_config,
                     query_config,
@@ -362,8 +354,7 @@ fn handle_connection(
     stream: UnixStream,
     project: &Path,
     loaded: &mut LoadResult,
-    watchman: &Watchman,
-    last_read: &mut WatchmanClock,
+    watchman: &mut Watchman,
     manifest: &ProjectManifest,
     elp_config: &ElpConfig,
     query_config: &BuckQueryConfig,
@@ -390,37 +381,31 @@ fn handle_connection(
         return Ok(true);
     }
 
-    // Check for ELP config changes — requires full restart
-    let config_patterns = vec!["**/.elp.toml", "**/.elp_lint.toml"];
-    let config_changed = !watchman
-        .get_changes(last_read, config_patterns)?
-        .files
-        .is_empty();
-    if config_changed {
-        eprintln!("[elp-daemon] ELP config change detected, shutting down for restart");
-        let done = serde_json::to_string(&DoneMessage::ok().with_restart())?;
-        let mut writer = BufWriter::new(&stream);
-        writeln!(writer, "{done}")?;
-        writer.flush()?;
-        return Ok(true);
+    // Check for file changes and apply them
+    match watchman.poll_and_apply_changes(loaded)? {
+        UpdateResult::NeedsRestart { reason } => {
+            eprintln!("[elp-daemon] {reason}");
+            let done = serde_json::to_string(&DoneMessage::ok().with_restart())?;
+            let mut writer = BufWriter::new(&stream);
+            writeln!(writer, "{done}")?;
+            writer.flush()?;
+            return Ok(true);
+        }
+        UpdateResult::NeedsFullReload { reason } => {
+            eprintln!("[elp-daemon] {reason}");
+            *loaded = load::load_project_from_manifest(
+                cli,
+                manifest,
+                elp_config,
+                IncludeOtp::Yes,
+                Mode::Shell,
+                query_config,
+                ifdef,
+            )?;
+            watchman.set_project_dirs(loaded);
+        }
+        UpdateResult::Updated => {}
     }
-
-    // Check for file changes
-    let reload_project = should_reload_project(watchman, last_read)?;
-    if reload_project {
-        eprintln!("[elp-daemon] Project change detected, reloading");
-        *loaded = load::load_project_from_manifest(
-            cli,
-            manifest,
-            elp_config,
-            IncludeOtp::Yes,
-            Mode::Shell,
-            query_config,
-            ifdef,
-        )?;
-        *last_read = watchman.get_clock()?;
-    }
-    *last_read = update_changes(loaded, watchman, last_read)?;
 
     // Create a shell struct for command parsing
     let shell = Shell {

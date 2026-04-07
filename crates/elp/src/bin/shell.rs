@@ -10,16 +10,14 @@
 
 use std::fmt;
 use std::ops::ControlFlow;
-use std::process::Command;
 use std::time::SystemTime;
 
 use anyhow::Result;
 use elp::build::load;
 use elp::build::types::LoadResult;
 use elp::cli::Cli;
+use elp::watchman::UpdateResult;
 use elp::watchman::Watchman;
-use elp::watchman::should_reload_project;
-use elp::watchman::update_changes;
 use elp_eqwalizer::Mode;
 use elp_ide::elp_ide_db::elp_base_db::IncludeOtp;
 use elp_log::telemetry;
@@ -210,15 +208,8 @@ pub fn run_shell(
     ifdef: bool,
 ) -> Result<()> {
     let start_time = SystemTime::now();
-    let mut cmd = Command::new("watchman");
-    let _ = cmd.arg("--version").output().map_err(|_| {
-            anyhow::Error::msg("`watchman` command not found. install it from https://facebook.github.io/watchman/ to use `elp shell`.")
-        })?;
 
-    let watchman = Watchman::new(&shell.project)
-        .map_err(|_err| anyhow::Error::msg(
-            "Could not find project. Are you in an Erlang project directory, or is one specified using --project?"
-        ))?;
+    let mut watchman = Watchman::new(&shell.project)?;
     let config = DiscoverConfig::new(false, "test");
     let mut loaded = load::load_project_at(
         cli,
@@ -229,9 +220,9 @@ pub fn run_shell(
         query_config,
         ifdef,
     )?;
+    watchman.set_project_dirs(&loaded);
     telemetry::report_elapsed_time("shell operational", start_time);
     let mut rl = rustyline::DefaultEditor::new()?;
-    let mut last_read = watchman.get_clock()?;
     write!(cli, "{WELCOME}")?;
     if !shell.command.is_empty() {
         let command = shell.command.join(" ");
@@ -245,21 +236,23 @@ pub fn run_shell(
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str())?;
-                let reload_project = should_reload_project(&watchman, &last_read)?;
-                if reload_project {
-                    let _ = cli.write(b"Project change detected, reloading project\n");
-                    loaded = load::load_project_at(
-                        cli,
-                        &shell.project,
-                        config.clone(),
-                        IncludeOtp::Yes,
-                        Mode::Shell,
-                        query_config,
-                        ifdef,
-                    )?;
-                    last_read = watchman.get_clock()?;
+                match watchman.poll_and_apply_changes(&mut loaded)? {
+                    UpdateResult::Updated => {}
+                    UpdateResult::NeedsFullReload { reason }
+                    | UpdateResult::NeedsRestart { reason } => {
+                        let _ = writeln!(cli, "{reason}");
+                        loaded = load::load_project_at(
+                            cli,
+                            &shell.project,
+                            config.clone(),
+                            IncludeOtp::Yes,
+                            Mode::Shell,
+                            query_config,
+                            ifdef,
+                        )?;
+                        watchman.set_project_dirs(&loaded);
+                    }
                 }
-                last_read = update_changes(&mut loaded, &watchman, &last_read)?;
                 if execute_line(shell, line, &mut loaded, cli)?.is_break() {
                     break;
                 }
