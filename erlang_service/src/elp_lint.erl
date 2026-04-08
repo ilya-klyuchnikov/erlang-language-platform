@@ -380,6 +380,14 @@ format_error({unbound_var,V}) ->
 format_error({unsafe_var,V,{What,Where}}) ->
     io_lib:format("variable ~w unsafe in ~w ~s",
                   [V,What,format_where(Where)]);
+format_error({export_var_subexpr,V,{What,Where}}) ->
+    io_lib:format("variable ~w exported from ~w ~s. "
+                  "Exporting bindings from subexpressions other than block expressions is "
+                  "deprecated and may yield an error in a future version of Erlang/OTP. "
+                  "Please move the binding of ~w out of the ~w. "
+                  "Compile directive 'nowarn_export_var_subexpr' can be used to suppress "
+                  "warnings in selected modules.",
+                  [V,What,format_where(Where),V,What]);
 format_error({exported_var,V,{What,Where}}) ->
     io_lib:format("variable ~w exported from ~w ~s",
                   [V,What,format_where(Where)]);
@@ -659,6 +667,9 @@ start(File, Opts) ->
 	 {export_vars,
 	  bool_option(warn_export_vars, nowarn_export_vars,
 		      false, Opts)},
+	 {export_var_subexpr,
+	  bool_option(warn_export_var_subexpr, nowarn_export_var_subexpr,
+		      true, Opts)},
 	 {shadow_vars,
 	  bool_option(warn_shadow_vars, nowarn_shadow_vars,
 		      true, Opts)},
@@ -2414,21 +2425,27 @@ expr({atom,Anno,A}, _Vt, St) ->
     {[],keyword_warning(Anno, A, St)};
 expr({string,_Anno,_S}, _Vt, St) -> {[],St};
 expr({nil,_Anno}, _Vt, St) -> {[],St};
-expr({cons,_Anno,H,T}, Vt, St) ->
-    expr_list([H,T], Vt, St);
+expr({cons,Anno,H,T}, Vt, St) ->
+    vtupd_export_expr_list({list, Anno}, [H, T], Vt, St);
 expr({lc,_Anno,E,Qs}, Vt, St) ->
     handle_comprehension(E, Qs, Vt, St);
 expr({bc,_Anno,E,Qs}, Vt, St) ->
     handle_comprehension(E, Qs, Vt, St);
 expr({mc,_Anno,E,Qs}, Vt, St) ->
     handle_comprehension(E, Qs, Vt, St);
-expr({tuple,_Anno,Es}, Vt, St) ->
-    expr_list(Es, Vt, St);
-expr({map,_Anno,Es}, Vt, St) ->
-    map_fields(Es, Vt, check_assoc_fields(Es, St), fun expr_list/3);
+expr({tuple,Anno,Es}, Vt, St) ->
+    vtupd_export_expr_list({tuple, Anno}, Es, Vt, St);
+expr({map,Anno,Es}, Vt, St) ->
+    map_fields(Es, Vt, check_assoc_fields(Es, St),
+               fun(Es0, Vt0, St0) ->
+                       vtupd_export_expr_list({map, Anno}, Es0, Vt0, St0)
+               end);
 expr({map,Anno,Src,Es}, Vt, St) ->
-    {Svt,St1} = expr(Src, Vt, St),
-    {Fvt,St2} = map_fields(Es, Vt, St1, fun expr_list/3),
+    {Svt,St1} = vtupd_export_expr_list({map, Anno}, [Src], Vt, St),
+    {Fvt,St2} = map_fields(Es, Vt, St1,
+                           fun(Es0, Vt0, St0) ->
+                                   vtupd_export_expr_list({map, Anno}, Es0, Vt0, St0)
+                           end),
     {vtupdate(Svt, Fvt), warn_if_literal_update(Anno, Src, St2)};
 expr({record_index,Anno,Name,Field}, _Vt, St) ->
     check_record(Anno, Name, St,
@@ -2455,11 +2472,13 @@ expr({record,Anno,Rec,Name,Upds}, Vt, St0) ->
         no -> {vtmerge(Rvt, Usvt), warn_if_literal_update(Anno, Rec, St2)};
         WildAnno -> {[],add_error(WildAnno, {wildcard_in_update,Name}, St2)}
     end;
-expr({bin,_Anno,Fs}, Vt, St) ->
-    expr_bin(Fs, Vt, St, fun expr/3);
-expr({block,_Anno,Es}, Vt, St) ->
+expr({bin,Anno,Fs}, Vt, St) ->
+    {Vt1, St1} = expr_bin(Fs, Vt, St, fun expr/3),
+    {vtupd_export({binary, Anno}, Vt1, Vt), St1};
+expr({block,Anno,Es}, Vt, St) ->
     %% Unfold block into a sequence.
-    exprs(Es, Vt, St);
+    {Vt1, St1} = exprs(Es, Vt, St),
+    {vtupd_export({'begin', Anno}, Vt1, Vt), St1};
 expr({'if',Anno,Cs}, Vt, St) ->
     icrt_clauses(Cs, {'if',Anno}, Vt, St);
 expr({'case',Anno,E,Cs}, Vt, St0) ->
@@ -2518,7 +2537,7 @@ expr({call,Anno,{remote,_Ar,{atom,_Am,M},{atom,Af,F}},As}, Vt, St0) ->
     St1 = keyword_warning(Af, F, St0),
     St2 = check_remote_function(Anno, M, F, As, St1),
     St3 = check_module_name(M, Anno, St2),
-    expr_list(As, Vt, St3);
+    vtupd_export_expr_list({call, Anno}, As, Vt, St3);
 expr({call,Anno,{remote,_Ar,M,F},As}, Vt, St0) ->
     St1 = keyword_warning(Anno, M, St0),
     St2 = keyword_warning(Anno, F, St1),
@@ -2528,10 +2547,10 @@ expr({call,Anno,{remote,_Ar,M,F},As}, Vt, St0) ->
               _ ->
                   St2
           end,
-    expr_list([M,F|As], Vt, St3);
+    vtupd_export_expr_list({call, Anno}, [M, F | As], Vt, St3);
 expr({call,Anno,{atom,Aa,F},As}, Vt, St0) ->
     St1 = keyword_warning(Aa, F, St0),
-    {Asvt,St2} = expr_list(As, Vt, St1),
+    {Asvt,St2} = vtupd_export_expr_list({call, Anno}, As, Vt, St1),
     A = length(As),
     IsLocal = is_local_function(St2#lint.locals,{F,A}),
     IsAutoBif = erl_internal:bif(F, A),
@@ -2575,7 +2594,7 @@ expr({call,Anno,{atom,Aa,F},As}, Vt, St0) ->
     end;
 expr({call,Anno,F,As}, Vt, St0) ->
     St = warn_invalid_call(Anno,F,St0),
-    expr_list([F|As], Vt, St);                  %They see the same variables
+    vtupd_export_expr_list({call, Anno}, [F | As], Vt, St); %They see the same variables
 expr({'try',Anno,Es,Scs,Ccs,As}, Vt, St0) ->
     %% The only exports we allow are from the try expressions to the
     %% success clauses.
@@ -2586,10 +2605,10 @@ expr({'try',Anno,Es,Scs,Ccs,As}, Vt, St0) ->
                              vtupdate(Evt0, Vt), Uvt, St1),
     Evt1 = vtupdate(Uvt, Evt0),
     Rvt0 = Sccs,
-    Rvt1 = vtupdate(vtunsafe(TryAnno, Rvt0, Vt), Rvt0),
+    Rvt1 = vtupd_unsafe(TryAnno, Rvt0, Vt),
     Evt2 = vtmerge(Evt1, Rvt1),
     {Avt0,St} = exprs(As, vtupdate(Evt2, Vt), St2),
-    Avt1 = vtupdate(vtunsafe(TryAnno, Avt0, Vt), Avt0),
+    Avt1 = vtupd_unsafe(TryAnno, Avt0, Vt),
     Avt = vtmerge(Evt2, Avt1),
     {Avt,St};
 expr({'catch',Anno,E}, Vt, St0) ->
@@ -2599,7 +2618,7 @@ expr({'catch',Anno,E}, Vt, St0) ->
               true -> add_warning(Anno, deprecated_catch, St);
               false -> St
           end,
-    {vtupdate(vtunsafe({'catch',Anno}, Evt, Vt), Evt),St1};
+    {vtupd_unsafe({'catch', Anno}, Evt, Vt), St1};
 expr({match,_Anno,P,E}, Vt, St0) ->
     {Evt,St1} = expr(E, Vt, St0),
     {Pvt,Pnew,St} = pattern(P, vtupdate(Evt, Vt), St1),
@@ -2622,20 +2641,20 @@ expr({'maybe',MaybeAnno,Es,{'else',ElseAnno,Cs}}, Vt, St) ->
     Cvt2 = vtmerge(Cvt0, Cvt1),
     {vtmerge(Evt2, Cvt2),St2};
 %% No comparison or boolean operators yet.
-expr({op,_Anno,_Op,A}, Vt, St) ->
-    expr(A, Vt, St);
+expr({op,Anno,Op,A}, Vt, St) ->
+    vtupd_export_expr_list({Op, Anno}, [A], Vt, St);
 expr({op,Anno,Op,L,R}, Vt, St0) when Op =:= 'orelse'; Op =:= 'andalso' ->
-    {Evt1,St1} = expr(L, Vt, St0),
+    {Evt1, St1} = vtupd_export_expr_list({Op, Anno}, [L], Vt, St0),
     Vt1 = vtupdate(Evt1, Vt),
     {Evt2,St2} = expr(R, Vt1, St1),
-    Evt3 = vtupdate(vtunsafe({Op,Anno}, Evt2, Vt1), Evt2),
+    Evt3 = vtupd_unsafe({Op, Anno}, Evt2, Vt1),
     {vtmerge(Evt1, Evt3),St2};
-expr({op,_Anno,EqOp,L,R}, Vt, St0) when EqOp =:= '=:='; EqOp =:= '=/=' ->
+expr({op,Anno,EqOp,L,R}, Vt, St0) when EqOp =:= '=:='; EqOp =:= '=/=' ->
     St = expr_check_match_zero(R, expr_check_match_zero(L, St0)),
-    expr_list([L,R], Vt, St);                   %They see the same variables
+    vtupd_export_expr_list({EqOp, Anno}, [L, R], Vt, St); %They see the same variables
 expr({op,Anno,Op,L,R}, Vt, St) ->
     St1 = warn_obsolete_op(Op, 2, Anno, St),
-    expr_list([L,R], Vt, St1);                  %They see the same variables
+    vtupd_export_expr_list({Op, Anno}, [L, R], Vt, St1); %They see the same variables
 %% The following are not allowed to occur anywhere!
 expr({remote,_Anno,M,_F}, _Vt, St) ->
     {[],add_error(erl_parse:first_anno(M), illegal_expr, St)};
@@ -2673,6 +2692,12 @@ expr_list(Es, Vt, St0) ->
                   {Evt, St2} = expr(E, Vt, St1),
                   vtmerge_pat(Evt, Esvt, St2)
           end, {[], St0}, Es).
+
+%% as expr_list but mark new vars as exported
+
+vtupd_export_expr_list(Where, Es, Vt, St) ->
+    {Evt, St1} = expr_list(Es, Vt, St),
+    {vtupd_export(Where, Evt, Vt), St1}.
 
 record_expr(Anno, Rec, Vt, St0) ->
     St1 = warn_invalid_record(Anno, Rec, St0),
@@ -3422,8 +3447,8 @@ add_missing_spec_warnings(Forms, St0, Type) ->
     Warns = %% functions + line numbers for which we should warn
 	case Type of
 	    all ->
-		[{FA,Anno} || {function,Anno,F,A,_} <- Forms,
-			   not lists:member(FA = {F,A}, Specs)];
+		[{{F,A},Anno} || {function,Anno,F,A,_} <- Forms,
+                                 not lists:member({F,A}, Specs)];
 	    _ ->
                 Exps0 = gb_sets:to_list(exports(St0)) -- pseudolocals(),
                 Exps1 =
@@ -3433,8 +3458,8 @@ add_missing_spec_warnings(Forms, St0, Type) ->
                             Exps0
                     end,
                 Exps = Exps1 -- Specs,
-		[{FA,Anno} || {function,Anno,F,A,_} <- Forms,
-			   member(FA = {F,A}, Exps)]
+		[{{F,A},Anno} || {function,Anno,F,A,_} <- Forms,
+                                 member({F,A}, Exps)]
 	end,
     foldl(fun ({FA,Anno}, St) ->
 		  add_warning(Anno, {missing_spec,FA}, St)
@@ -3952,8 +3977,14 @@ pat_var(V, Anno, Vt, New, St0) ->
                 {ok,{{export,From},_Usage,Ls}} ->
                     St = warn_underscore_match(V, Anno, St0),
                     {[{V,{bound,used,Ls}}],[],
-                     %% As this is matching, exported vars are risky.
-                     add_error(Anno, {exported_var,V,From}, St)};
+                     case export_var_subexpr(From) of
+                         true ->
+                             maybe_add_warning(Anno, {export_var_subexpr,V,From}, St);
+                         false ->
+                             %% As this is matching, exported vars are risky.
+                             %% Always warn unconditionally.
+                             add_warning(Anno, {exported_var,V,From}, St)
+                     end};
                 error when St0#lint.recdef_top ->
                     {[],[{V,{bound,unused,[Anno]}}],
                      add_error(Anno, {variable_in_record_def,V}, St0)};
@@ -4006,9 +4037,17 @@ pat_binsize_var(V, Anno, Vt, New, St) ->
                      add_error(Anno, {unsafe_var,V,In}, St)};
                 {ok,{{export,From},_Used,As}} ->
                     {[{V,{bound,used,As}}],[],
-                     %% As this is not matching, exported vars are
-                     %% probably safe.
-                     exported_var(Anno, V, From, St)};
+                     case export_var_subexpr(From) of
+                         true ->
+                             maybe_add_warning(Anno, {export_var_subexpr,V,From}, St);
+                         false ->
+                             %% As this is not matching, exported vars are
+                             %% probably safe. The warning is conditional.
+                             case is_warn_enabled(export_vars, St) of
+                                 true -> add_warning(Anno, {exported_var,V,From}, St);
+                                 false -> St
+                             end
+                     end};
                 error ->
                     {[{V,{bound,used,[Anno]}}],[],
                      add_error(Anno, {unbound_var,V}, St)}
@@ -4038,12 +4077,18 @@ do_expr_var(V, Anno, Vt, St) ->
             {[{V,{bound,used,As}}],
              add_error(Anno, {unsafe_var,V,In}, St)};
         {ok,{{export,From},_Usage,As}} ->
-            case is_warn_enabled(export_vars, St) of
+            case export_var_subexpr(From) of
                 true ->
                     {[{V,{bound,used,As}}],
-                     add_error(Anno, {exported_var,V,From}, St)};
+                     maybe_add_warning(Anno, {export_var_subexpr,V,From}, St)};
                 false ->
-                    {[{V,{{export,From},used,As}}],St}
+                    case is_warn_enabled(export_vars, St) of
+                        true ->
+                            {[{V,{bound,used,As}}],
+                             add_warning(Anno, {exported_var,V,From}, St)};
+                        false ->
+                            {[{V,{{export,From},used,As}}],St}
+                    end
             end;
         {ok,{stacktrace,_Usage,As}} ->
             {[{V,{bound,used,As}}],
@@ -4053,11 +4098,14 @@ do_expr_var(V, Anno, Vt, St) ->
              add_error(Anno, {unbound_var,V}, St)}
     end.
 
-exported_var(Anno, V, From, St) ->
-    case is_warn_enabled(export_vars, St) of
-        true -> add_error(Anno, {exported_var,V,From}, St);
-        false -> St
-    end.
+%% warn about exporting from non-block subexpressions
+export_var_subexpr({'begin',_}) -> false;
+export_var_subexpr({'if',_}) -> false;
+export_var_subexpr({'case',_}) -> false;
+export_var_subexpr({'receive',_}) -> false;
+export_var_subexpr({'try',_}) -> false;
+export_var_subexpr({'maybe',_}) -> false;
+export_var_subexpr(_) -> true.
 
 shadow_vars(Vt, Vt0, In, St0) ->
     case is_warn_enabled(shadow_vars, St0) of
@@ -4115,11 +4163,28 @@ vtupdate(Uvt, Vt0) ->
                   end, Uvt, Vt0).
 
 %% vtunsafe(From, UpdVarTable, VarTable) -> UnsafeVarTable.
-%%  Return all new variables in UpdVarTable as unsafe.
+%%  Mark all new variables in UpdVarTable as unsafe.
 
 vtunsafe({Tag,Anno}, Uvt, Vt) ->
     Location = erl_anno:location(Anno),
-    [{V,{{unsafe,{Tag,Location}},U,As}} || {V,{_,U,As}} <- vtnew(Uvt, Vt)].
+    vt_mark_new({unsafe,{Tag,Location}}, Uvt, Vt).
+
+vtupd_unsafe(Where, NewVt, OldVt) ->
+    vtupdate(vtunsafe(Where, NewVt, OldVt), NewVt).
+
+%% vtexport(From, UpdVarTable, VarTable) -> ExpVarTable.
+%%  Mark all new variables in UpdVarTable as exported.
+
+vtexport({Tag, Anno}, Uvt, Vt) ->
+    Location = erl_anno:location(Anno),
+    vt_mark_new({export, {Tag, Location}}, Uvt, Vt).
+
+vtupd_export(Where, NewVt, OldVt) ->
+    vtupdate(vtexport(Where, NewVt, OldVt), NewVt).
+
+vt_mark_new(S, Uvt, Vt) ->
+    [{V, {merge_state(S, S0), U, Ls}}
+     || {V, {S0, U, Ls}} <- vtnew(Uvt, Vt)].
 
 %% vtmerge(VarTable, VarTable) -> VarTable.
 %%  Merge two variables tables generating a new vartable. Give priority to
