@@ -317,6 +317,8 @@ make_code(elp_lint, {export_var_subexpr, _V, {_What, _Where}}) ->
     "L1326";
 make_code(elp_lint, compr_assign) ->
     "L1327";
+make_code(elp_lint, illegal_map_exact_in_comprehension) ->
+    "L1328";
 make_code(elp_lint, _Other) ->
     "L1399";
 %% stdlib-3.15.2/src/erl_scan.erl
