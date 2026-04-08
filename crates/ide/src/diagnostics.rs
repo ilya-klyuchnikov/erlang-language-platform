@@ -634,6 +634,12 @@ fn should_run(
     is_generated: bool,
     is_test: bool,
 ) -> bool {
+    if let Some(filter) = &config.diagnostic_filter
+        && *filter != linter.id()
+        && !config.recursive
+    {
+        return false;
+    }
     if !should_process_app(app_name, config, &linter.id()) {
         return false;
     }
@@ -1155,10 +1161,12 @@ pub struct DiagnosticsConfig {
     pub enabled: EnabledDiagnostics,
     pub lints_from_config: LintsFromConfig,
     pub lint_config: Option<LintConfig>,
+    pub diagnostic_filter: Option<DiagnosticCode>,
     pub include_generated: bool,
     pub include_suppressed: bool,
     pub include_otp: bool,
     pub use_cli_severity: bool,
+    pub recursive: bool,
     /// Used in `elp lint` to request erlang service diagnostics if
     /// needed.
     pub request_erlang_service_diagnostics: bool,
@@ -1213,6 +1221,7 @@ impl DiagnosticsConfig {
         // If a diagnostic_filter is specified, enable the corresponding linter in lint_config
         if let Some(diagnostic_filter) = diagnostic_filter {
             let diagnostic_filter_code = DiagnosticCode::from(diagnostic_filter.as_str());
+            self.diagnostic_filter = Some(diagnostic_filter_code.clone());
             self.set_linter_enabled(diagnostic_filter_code, true);
         }
 
@@ -1242,6 +1251,11 @@ impl DiagnosticsConfig {
 
     pub fn set_use_cli_severity(mut self, value: bool) -> DiagnosticsConfig {
         self.use_cli_severity = value;
+        self
+    }
+
+    pub fn set_recursive(mut self, value: bool) -> DiagnosticsConfig {
+        self.recursive = value;
         self
     }
 

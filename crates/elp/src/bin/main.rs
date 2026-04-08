@@ -1300,7 +1300,6 @@ mod tests {
         let expected_dir = get_resources_dir().join("lint/lint_recursive");
         LintFixSettings::new(tmp_path, expected_dir.as_path(), &[])
             .buck(buck)
-            .expect_code(101)
             .sorted()
             .check_lint_fix(
                 args_vec![
@@ -1312,9 +1311,7 @@ mod tests {
                 ],
                 "linter",
                 resource_file!("linter/parse_elp_lint_config_output.stdout"),
-                Some(expect![[r#"
-                    Errors found
-                "#]]),
+                None,
             )
             .expect("bad test");
     }

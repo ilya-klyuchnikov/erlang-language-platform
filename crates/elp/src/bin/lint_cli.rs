@@ -839,7 +839,8 @@ fn get_diagnostics_config(args: &Lint) -> Result<DiagnosticsConfig> {
         .set_include_generated(args.include_generated)
         .set_experimental(args.experimental_diags)
         .set_include_suppressed(args.include_suppressed)
-        .set_use_cli_severity(args.use_cli_severity);
+        .set_use_cli_severity(args.use_cli_severity)
+        .set_recursive(args.recursive);
     Ok(cfg)
 }
 
