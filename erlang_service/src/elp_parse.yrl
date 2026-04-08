@@ -88,6 +88,7 @@ Left 400 add_op.
 Left 500 mult_op.
 Unary 600 prefix_op.
 Nonassoc 700 '#'.
+Left 750 '('.
 Nonassoc 800 ':'.
 
 %% Types
@@ -248,9 +249,9 @@ expr -> map_expr : '$1'.
 expr -> function_call : '$1'.
 expr -> record_expr : '$1'.
 expr -> expr_remote : '$1'.
+expr -> expr_max : '$1'.
 
-expr_remote -> expr_max ':' expr_max : {remote, ?anno('$1', '$3'), '$1', '$3'}.
-expr_remote -> expr_max : '$1'.
+expr_remote -> expr ':' expr : {remote, ?anno('$1', '$3'), '$1', '$3'}.
 
 expr_max -> var : '$1'.
 expr_max -> atomic : '$1'.
@@ -414,7 +415,7 @@ record_field -> atom '=' expr : {record_field,?anno('$1','$3'),'$1','$3'}.
 
 %% N.B. This is called from expr.
 
-function_call -> expr_remote argument_list :
+function_call -> expr argument_list :
 	{call,?anno('$1', '$2'),'$1',element(1, '$2')}.
 
 if_expr -> 'if' if_clauses 'end' : {'if',?anno('$1','$3'),'$2'}.
@@ -1782,7 +1783,8 @@ inop_prec('div') -> {500, 500, 600};
 inop_prec('rem') -> {500, 500, 600};
 inop_prec('band') -> {500, 500, 600};
 inop_prec('and') -> {500, 500, 600};
-inop_prec('#') -> {800, 700, 800};
+inop_prec('#') -> {750, 700, 750};
+inop_prec('(') -> {750, 750, 800};
 inop_prec(':') -> {900, 800, 900};
 inop_prec('.') -> {900, 900, 1000}.
 
