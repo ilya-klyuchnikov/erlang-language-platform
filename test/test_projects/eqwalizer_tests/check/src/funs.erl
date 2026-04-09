@@ -378,3 +378,13 @@ callback_test_2(_F) -> ok.
 
 -spec use_callback_test_2() -> ok.
 use_callback_test_2() -> callback_test_2(fun (_T) -> ok end).
+
+-spec app_bin(fun((binary()) -> binary())) -> binary().
+app_bin(F) -> F(<<"foo">>).
+
+-spec id(X) -> X.
+id(X) -> X.
+
+-spec app_id_bin() -> binary().
+% eta expansion / type containement for monomorphic applications
+app_id_bin() -> app_bin(fun id/1).
