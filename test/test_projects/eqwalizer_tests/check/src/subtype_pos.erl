@@ -86,6 +86,12 @@ ty_var_sub_any_2(T, T) ->
 -spec id(T) -> T.
 id(X) -> X.
 
+-spec pair_id({A, B}) -> {A, B}.
+pair_id(X) -> X.
+
+-spec pair_swap({A, B}) -> {B, A}.
+pair_swap({X, Y}) -> {Y, X}.
+
 -spec foralls_matter() -> unreachable.
 foralls_matter() ->
     X = fun erlang:is_number/1,
@@ -132,3 +138,24 @@ nil_2(L) -> L.
 
 -spec nil_3([none() | none()]) -> [].
 nil_3(L) -> L.
+
+-spec type_containment_1() -> fun((atom()) -> atom()).
+type_containment_1() -> fun id/1.
+
+-spec type_containment_2() -> fun((atom()) -> atom() | binary()).
+type_containment_2() -> fun id/1.
+
+-spec type_containment_3() -> fun(({atom(), binary()}) -> {atom(), binary()}).
+type_containment_3() -> fun pair_id/1.
+
+-spec type_containment_4() -> fun(({atom(), binary()}) -> {atom() | binary(), atom() | binary()}).
+type_containment_4() -> fun pair_id/1.
+
+-spec type_containment_5() -> fun(({atom(), binary()}) -> {binary(), atom()}).
+type_containment_5() -> fun pair_swap/1.
+
+-spec type_containment_6() -> fun(({atom(), binary()}) -> {atom() | binary(), atom() | binary()}).
+type_containment_6() -> fun pair_swap/1.
+
+-spec type_containment_7() -> fun(({atom() | binary(), binary()}) -> {atom() | binary(), atom() | binary()}).
+type_containment_7() -> fun pair_id/1.

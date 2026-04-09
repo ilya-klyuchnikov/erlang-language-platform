@@ -292,4 +292,60 @@ Because in the expression's type:
     Context expects type: none()
   ]
 
-20 ERRORS
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/subtype_neg.erl:109:25
+    │
+109 │ type_containment_1() -> fun id/1.
+    │                         ^^^^^^^^
+    │                         │
+    │                         id/1.
+Expression has type:   fun((T) -> T) with 1 type parameter
+Context expected type: fun((atom() | binary()) -> atom()) with 0 type parameters
+    │                         
+
+Because in the expression's type:
+  Here the type is:     fun((T) -> T) with 1 type parameter
+  Context expects type: fun((atom() | binary()) -> atom()) with 0 type parameters
+  The number of type parameters doesn't match.
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/subtype_neg.erl:112:25
+    │
+112 │ type_containment_2() -> fun pair_id/1.
+    │                         ^^^^^^^^^^^^^
+    │                         │
+    │                         pair_id/1.
+Expression has type:   fun(({A, B}) -> {A, B}) with 2 type parameters
+Context expected type: fun(({atom(), binary()}) -> {binary(), atom()}) with 0 type parameters
+    │                         
+
+Because in the expression's type:
+  Here the type is:     fun(({A, B}) -> {A, B}) with 2 type parameters
+  Context expects type: fun()/1 with 0 type parameters
+  The number of type parameters doesn't match.
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/subtype_neg.erl:115:25
+    │
+115 │ type_containment_3() -> fun pair_swap/1.
+    │                         ^^^^^^^^^^^^^^^
+    │                         │
+    │                         pair_swap/1.
+Expression has type:   fun(({A, B}) -> {B, A}) with 2 type parameters
+Context expected type: fun(({atom(), binary()}) -> {binary(), number()}) with 0 type parameters
+    │                         
+
+Because in the expression's type:
+  Here the type is:     fun(({A, B}) -> {B, A}) with 2 type parameters
+  Context expects type: fun()/1 with 0 type parameters
+  The number of type parameters doesn't match.
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/subtype_neg.erl:118:11
+    │
+118 │ test() -> fun pair_swap/1.
+    │           ^^^^^^^^^^^^^^^ pair_swap/1.
+Expression has type:   fun(({A, B}) -> {B, A})
+Context expected type: atom()
+
+24 ERRORS

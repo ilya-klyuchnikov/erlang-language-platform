@@ -95,3 +95,24 @@ nil_1(L) -> L.
 
 -spec nil_2([a] | [none()]) -> [].
 nil_2(L) -> L.
+
+-spec id(T) -> T.
+id(X) -> X.
+
+-spec pair_id({A, B}) -> {A, B}.
+pair_id(X) -> X.
+
+-spec pair_swap({A, B}) -> {B, A}.
+pair_swap({X, Y}) -> {Y, X}.
+
+-spec type_containment_1() -> fun((atom() | binary()) -> atom()).
+type_containment_1() -> fun id/1.
+
+-spec type_containment_2() -> fun(({atom(), binary()}) -> {binary(), atom()}).
+type_containment_2() -> fun pair_id/1.
+
+-spec type_containment_3() -> fun(({atom(), binary()}) -> {binary(), integer()}).
+type_containment_3() -> fun pair_swap/1.
+
+-spec test() -> atom().
+test() -> fun pair_swap/1.
