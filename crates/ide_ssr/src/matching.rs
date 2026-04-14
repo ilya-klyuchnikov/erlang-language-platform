@@ -736,15 +736,16 @@ impl<'a> Matcher<'a> {
                 SubIdRef::AnyExprRef(AnyExprRef::Expr(Expr::Literal(pat_lit))),
                 SubIdRef::AnyExprRef(AnyExprRef::Expr(Expr::Literal(code_lit))),
             ) => {
-                let pat_lit_str = render_str(self.sema, pat_lit);
-                let code_lit_str = render_str(self.sema, code_lit);
-                if pat_lit_str == code_lit_str {
+                // Compare Literal enums directly — they derive PartialEq,
+                // and for Literal::Atom this compares interned IDs without
+                // Salsa lookups. Only render to strings for error messages.
+                if pat_lit == code_lit {
                     return Ok(());
                 } else {
                     fail_match!(
                         "Pattern had `{}`, code had `{}`",
-                        &pat_lit_str,
-                        &code_lit_str
+                        render_str(self.sema, pat_lit),
+                        render_str(self.sema, code_lit)
                     );
                 }
             }
@@ -752,15 +753,13 @@ impl<'a> Matcher<'a> {
                 SubIdRef::AnyExprRef(AnyExprRef::Pat(Pat::Literal(pat_lit))),
                 SubIdRef::AnyExprRef(AnyExprRef::Pat(Pat::Literal(code_lit))),
             ) => {
-                let pat_lit_str = render_str(self.sema, pat_lit);
-                let code_lit_str = render_str(self.sema, code_lit);
-                if pat_lit_str == code_lit_str {
+                if pat_lit == code_lit {
                     return Ok(());
                 } else {
                     fail_match!(
                         "Pattern had `{}`, code had `{}`",
-                        &pat_lit_str,
-                        &code_lit_str
+                        render_str(self.sema, pat_lit),
+                        render_str(self.sema, code_lit)
                     );
                 }
             }
@@ -777,7 +776,10 @@ impl<'a> Matcher<'a> {
                 self.attempt_match_var(code_var, pat_var)?;
             }
             (SubIdRef::Atom(pat_atom), SubIdRef::Atom(code_atom)) => {
-                if self.sema.db.lookup_atom(pat_atom) == self.sema.db.lookup_atom(*code_atom) {
+                // Compare interned IDs directly — both are from the same
+                // Salsa database, so equal IDs mean equal names. This avoids
+                // two Salsa intern lookups per atom comparison.
+                if pat_atom == *code_atom {
                     return Ok(());
                 } else {
                     fail_match!(
@@ -805,7 +807,8 @@ impl<'a> Matcher<'a> {
     }
 
     fn attempt_match_var(&self, code_var: &Var, pat_var: &Var) -> Result<(), MatchFailed> {
-        if self.sema.db.lookup_var(*pat_var) == self.sema.db.lookup_var(*code_var) {
+        // Compare interned IDs directly — avoids Salsa intern lookups.
+        if pat_var == code_var {
             Ok(())
         } else {
             fail_match!(
@@ -866,14 +869,12 @@ impl<'a> Matcher<'a> {
         }
     }
 
-    fn get_code_str(&self, id: &SubId) -> String {
+    fn get_code_str(&self, id: &SubId) -> Cow<'static, str> {
         id.variant_str(self.code_body, self.sema.db.upcast())
-            .to_string()
     }
 
-    fn get_pattern_str(&self, id: &SubId) -> String {
+    fn get_pattern_str(&self, id: &SubId) -> Cow<'static, str> {
         id.variant_str(self.pattern_body, self.sema.db.upcast())
-            .to_string()
     }
 
     /// Check if the pattern_body SubId is a placeholder
