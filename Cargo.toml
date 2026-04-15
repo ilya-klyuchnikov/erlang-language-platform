@@ -90,7 +90,7 @@ regex = "1.10.6"
 rowan = "0.15.15"
 rust-ini = "0.18"
 rustc-hash = "1.1.0"
-rustyline = "17.0.2"
+rustyline = "18.0.0"
 salsa = "0.17.0-pre.2"
 semver = "1.0.23"
 serde = { version = "1.0.206", features = ["derive", "rc"] }
