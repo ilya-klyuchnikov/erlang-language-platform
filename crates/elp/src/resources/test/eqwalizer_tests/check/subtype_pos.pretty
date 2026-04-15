@@ -10,20 +10,4 @@ error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered
 41 │ f08(X) -> X.
    │ ^^^^^^^^^^^ Clause is not covered by spec
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/subtype_pos.erl:171:19
-    │
-171 │     app_gen_shape(fun gen_shape/1).
-    │                   ^^^^^^^^^^^^^^^
-    │                   │
-    │                   gen_shape/1.
-Expression has type:   fun((#{a := {X}, b := {X}, dynamic() => dynamic()}) -> {X, X}) with 1 type parameter
-Context expected type: fun((#{a := {atom()}, dynamic() => dynamic()}) -> {atom(), atom()}) with 0 type parameters
-    │                   
-
-Because in the expression's type:
-  Here the type is:     fun()/1 with 1 type parameter
-  Context expects type: fun()/1 with 0 type parameters
-  The number of type parameters doesn't match.
-
-3 ERRORS
+2 ERRORS
