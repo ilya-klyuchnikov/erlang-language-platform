@@ -930,23 +930,4 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   {}
 Context expected type: [dynamic()]
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:759:35
-    │
-759 │ gen_shape_app(Shape) -> gen_shape(Shape).
-    │                                   ^^^^^
-    │                                   │
-    │                                   Shape.
-Expression has type:   #{a := {atom()}, dynamic() => dynamic()}
-Context expected type: #{a := {X}, b := {X}, dynamic() => dynamic()}
-    │                                   
-
-Because in the expression's type:
-  #{ a =>
-    { 
-      Here the type is:     atom()
-      Context expects type: X
-    }
-  , ... }
-
-78 ERRORS
+77 ERRORS
