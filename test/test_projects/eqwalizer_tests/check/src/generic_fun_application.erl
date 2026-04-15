@@ -751,3 +751,9 @@ use_fun_with_tuple_1() ->
 use_fun_with_tuple_2_neg() ->
     _ = fun_with_tuple({a, b}, {}),
     ok.
+
+-spec gen_shape(#{a := {X}, b := {X}, dynamic() => dynamic()}) -> {X, X}.
+gen_shape(#{a := {A}, b := {B}}) -> {A, B}.
+
+-spec gen_shape_app(#{a := {atom()}, dynamic() => dynamic()}) -> {atom(), atom()}.
+gen_shape_app(Shape) -> gen_shape(Shape).
