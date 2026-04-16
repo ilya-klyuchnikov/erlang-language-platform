@@ -1,1 +1,20 @@
-NO ERRORS
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+   ┌─ check/src/refine_aliases.erl:51:36
+   │
+51 │     execute(#client{pid = self()}, H, opts).
+   │                                    ^
+   │                                    │
+   │                                    H.
+Expression has type:   handler('ok') | txn_handler('ok')
+Context expected type: handler('ok')
+   │                                    
+
+Because in the expression's type:
+  The type is a union type with some valid candidates: handler('ok')
+  However, the following candidate doesn't match:
+  fun((
+    Here the type is:     #client{}
+    Context expects type: #txn{}
+  , binary()) -> 'ok')
+
+1 ERROR
