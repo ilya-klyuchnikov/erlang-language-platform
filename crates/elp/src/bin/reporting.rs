@@ -23,6 +23,7 @@ use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term;
 use codespan_reporting::term::termcolor::Color;
 use codespan_reporting::term::termcolor::ColorSpec;
+use codespan_reporting::term::termcolor::WriteColor;
 use elp::arc_types;
 use elp::build::types::LoadResult;
 use elp::cli::Cli;
@@ -167,23 +168,7 @@ impl Reporter for PrettyReporter<'_> {
     }
 
     fn write_error_count(&mut self) -> Result<()> {
-        if self.error_count == 0 {
-            self.cli.set_color(&GREEN_COLOR_SPEC)?;
-            write!(self.cli, "NO ERRORS")?;
-            self.cli.reset()?;
-            writeln!(self.cli)?;
-        } else {
-            self.cli.set_color(&CYAN_COLOR_SPEC)?;
-            let noun = if self.error_count == 1 {
-                "ERROR"
-            } else {
-                "ERRORS"
-            };
-            write!(self.cli, "{} {}", self.error_count, noun)?;
-            self.cli.reset()?;
-            writeln!(self.cli)?;
-        }
-        Ok(())
+        write_error_count_summary(self.cli, self.error_count)
     }
 
     fn write_stats(&mut self, count: u64, total: u64) -> Result<()> {
@@ -296,6 +281,22 @@ impl Reporter for JsonReporter<'_> {
     fn progress(&self, len: u64, prefix: &'static str) -> ProgressBar {
         self.cli.progress(len, prefix)
     }
+}
+
+pub fn write_error_count_summary(writer: &mut dyn WriteColor, error_count: usize) -> Result<()> {
+    if error_count == 0 {
+        writer.set_color(&GREEN_COLOR_SPEC)?;
+        write!(writer, "NO ERRORS")?;
+        writer.reset()?;
+        writeln!(writer)?;
+    } else {
+        writer.set_color(&CYAN_COLOR_SPEC)?;
+        let noun = if error_count == 1 { "ERROR" } else { "ERRORS" };
+        write!(writer, "{} {}", error_count, noun)?;
+        writer.reset()?;
+        writeln!(writer)?;
+    }
+    Ok(())
 }
 
 pub fn format_raw_parse_error(errs: &[ParseDiagnostic]) -> String {

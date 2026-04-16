@@ -61,6 +61,7 @@ use crate::args::EqwalizeApp;
 use crate::args::EqwalizeTarget;
 use crate::args::Shell;
 use crate::eqwalizer_cli;
+use crate::reporting;
 use crate::shell::ShellCommand;
 
 // ---------------------------------------------------------------------------
@@ -528,6 +529,7 @@ fn connect_and_run(
     // Read response lines
     let reader = BufReader::new(&stream);
     let mut exit_code = 0;
+    let mut diagnostic_count: usize = 0;
     for line in reader.lines() {
         let line = line?;
         // Try to detect done message first (small JSON with "type" field)
@@ -558,12 +560,17 @@ fn connect_and_run(
             break;
         }
         // Diagnostic line
+        diagnostic_count += 1;
         if format_json {
             writeln!(cli, "{line}")?;
         } else {
             let diag: elp::arc_types::Diagnostic = serde_json::from_str(&line)?;
             write!(cli, "{diag}")?;
         }
+    }
+
+    if !format_json {
+        reporting::write_error_count_summary(cli, diagnostic_count)?;
     }
 
     if exit_code != 0 {
