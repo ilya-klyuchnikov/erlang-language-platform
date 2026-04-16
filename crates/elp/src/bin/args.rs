@@ -128,7 +128,7 @@ pub struct Eqwalize {
     pub connect: bool,
     /// Exit with a non-zero status code if any errors are found
     pub bail_on_error: bool,
-    /// Eqwalize specified modules
+    /// Eqwalize specified modules (not files)
     #[bpaf(
         positional("MODULES"),
         guard(at_least_1, "there should be at least one module")
@@ -692,7 +692,7 @@ pub fn command() -> impl Parser<Command> {
         .map(Command::Eqwalize)
         .to_options()
         .command("eqwalize")
-        .help("Eqwalize specified module");
+        .help("Eqwalize specified modules");
 
     let eqwalize_all = eqwalize_all()
         .map(Command::EqwalizeAll)

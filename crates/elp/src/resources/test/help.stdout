@@ -17,7 +17,7 @@ Available commands:
     server                Run lsp server
     shell                 Starts an interactive ELP shell
     daemon                Manage a persistent ELP daemon for fast turnaround
-    eqwalize              Eqwalize specified module
+    eqwalize              Eqwalize specified modules
     eqwalize-all          Eqwalize all opted-in modules in a project
     eqwalize-app          Eqwalize all opted-in modules in specified application
     eqwalize-target       Eqwalize all opted-in modules in specified buck target
