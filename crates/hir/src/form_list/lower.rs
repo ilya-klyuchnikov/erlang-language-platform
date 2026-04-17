@@ -137,6 +137,8 @@ impl<'a> Ctx<'a> {
                     }
                     ast::Form::FileAttribute(_) => None,
                     ast::Form::ImportAttribute(import) => self.lower_import(import),
+                    // TODO: (T262108365) fully implemented in the next commit
+                    ast::Form::ImportRecordAttribute(_) => None,
                     ast::Form::Opaque(opaque) => self.lower_opaque(opaque),
                     ast::Form::OptionalCallbacksAttribute(cbs) => {
                         self.lower_optional_callbacks(cbs)

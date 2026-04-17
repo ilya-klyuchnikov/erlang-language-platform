@@ -2733,6 +2733,7 @@ pub enum Form {
     FileAttribute(FileAttribute),
     FunDecl(FunDecl),
     ImportAttribute(ImportAttribute),
+    ImportRecordAttribute(ImportRecordAttribute),
     ModuleAttribute(ModuleAttribute),
     Nominal(Nominal),
     Opaque(Opaque),
@@ -2768,6 +2769,7 @@ impl AstNode for Form {
             | FILE_ATTRIBUTE
             | FUN_DECL
             | IMPORT_ATTRIBUTE
+            | IMPORT_RECORD_ATTRIBUTE
             | MODULE_ATTRIBUTE
             | NOMINAL
             | OPAQUE
@@ -2804,6 +2806,9 @@ impl AstNode for Form {
             FILE_ATTRIBUTE => Some(Form::FileAttribute(FileAttribute { syntax })),
             FUN_DECL => Some(Form::FunDecl(FunDecl { syntax })),
             IMPORT_ATTRIBUTE => Some(Form::ImportAttribute(ImportAttribute { syntax })),
+            IMPORT_RECORD_ATTRIBUTE => Some(Form::ImportRecordAttribute(ImportRecordAttribute {
+                syntax,
+            })),
             MODULE_ATTRIBUTE => Some(Form::ModuleAttribute(ModuleAttribute { syntax })),
             NOMINAL => Some(Form::Nominal(Nominal { syntax })),
             OPAQUE => Some(Form::Opaque(Opaque { syntax })),
@@ -2832,6 +2837,7 @@ impl AstNode for Form {
             Form::FileAttribute(it) => it.syntax(),
             Form::FunDecl(it) => it.syntax(),
             Form::ImportAttribute(it) => it.syntax(),
+            Form::ImportRecordAttribute(it) => it.syntax(),
             Form::ModuleAttribute(it) => it.syntax(),
             Form::Nominal(it) => it.syntax(),
             Form::Opaque(it) => it.syntax(),
@@ -2899,6 +2905,11 @@ impl From<FunDecl> for Form {
 impl From<ImportAttribute> for Form {
     fn from(node: ImportAttribute) -> Form {
         Form::ImportAttribute(node)
+    }
+}
+impl From<ImportRecordAttribute> for Form {
+    fn from(node: ImportRecordAttribute) -> Form {
+        Form::ImportRecordAttribute(node)
     }
 }
 impl From<ModuleAttribute> for Form {
@@ -3396,6 +3407,75 @@ impl AstNode for ImportAttribute {
 }
 #[doc = r" Via NodeType::Node 2 display"]
 impl std::fmt::Display for ImportAttribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.syntax(), f)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct inner"]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ImportRecordAttribute {
+    pub(crate) syntax: SyntaxNode,
+}
+impl ImportRecordAttribute {
+    pub fn module(&self) -> Option<Name> {
+        support::child(&self.syntax, 0usize)
+    }
+    pub fn records(&self) -> Option<ImportRecordNames> {
+        support::child(&self.syntax, 0usize)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct"]
+impl AstNode for ImportRecordAttribute {
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == IMPORT_RECORD_ATTRIBUTE
+    }
+    #[doc = r" Via field_casts"]
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+    fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+}
+#[doc = r" Via NodeType::Node 2 display"]
+impl std::fmt::Display for ImportRecordAttribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.syntax(), f)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct inner"]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ImportRecordNames {
+    pub(crate) syntax: SyntaxNode,
+}
+impl ImportRecordNames {
+    pub fn names(&self) -> AstChildren<Name> {
+        support::children(&self.syntax)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct"]
+impl AstNode for ImportRecordNames {
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == IMPORT_RECORD_NAMES
+    }
+    #[doc = r" Via field_casts"]
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+    fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+}
+#[doc = r" Via NodeType::Node 2 display"]
+impl std::fmt::Display for ImportRecordNames {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(self.syntax(), f)
     }
