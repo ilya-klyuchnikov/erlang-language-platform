@@ -2220,6 +2220,7 @@ bar() ->
                         Form::DeprecatedAttribute(_) => acc,
                         Form::FeatureAttribute(_) => acc,
                         Form::ImportRecord(_) => acc,
+                        Form::ExportRecord(_) => acc,
                         Form::SsrDefinition(_) => acc,
                     }
                 } else {

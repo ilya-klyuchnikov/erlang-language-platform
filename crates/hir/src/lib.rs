@@ -105,6 +105,8 @@ pub use form_list::Define;
 pub use form_list::DefineId;
 pub use form_list::Export;
 pub use form_list::ExportId;
+pub use form_list::ExportRecord;
+pub use form_list::ExportRecordId;
 pub use form_list::FaEntry;
 pub use form_list::FaEntryId;
 pub use form_list::FormId;

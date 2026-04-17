@@ -76,6 +76,7 @@ pub struct DefMap {
     optional_callbacks: FxHashSet<NameArity>,
     imported_functions: FxHashMap<NameArity, Name>,
     imported_records: FxHashMap<Name, Name>,
+    exported_records: FxHashSet<Name>,
     types: FxHashMap<NameArity, TypeAliasDef>,
     exported_types: FxHashSet<NameArity>,
     records: FxHashMap<Name, RecordDef>,
@@ -359,6 +360,13 @@ impl DefMap {
                         def_map
                             .imported_records
                             .insert(form_list[entry_id].name.clone(), module);
+                    }
+                }
+                FormIdx::ExportRecord(idx) => {
+                    for entry_id in form_list[idx].entries.clone() {
+                        def_map
+                            .exported_records
+                            .insert(form_list[entry_id].name.clone());
                     }
                 }
                 FormIdx::Behaviour(idx) => {
@@ -719,6 +727,8 @@ impl DefMap {
                 .iter()
                 .map(|(name, module)| (name.clone(), module.clone())),
         );
+        self.exported_records
+            .extend(other.exported_records.iter().cloned());
         self.types.extend(
             other
                 .types
@@ -934,6 +944,7 @@ impl DefMap {
             exported_functions,
             imported_functions,
             imported_records,
+            exported_records,
             types,
             exported_types,
             records,
@@ -957,6 +968,7 @@ impl DefMap {
         exported_functions.shrink_to_fit();
         imported_functions.shrink_to_fit();
         imported_records.shrink_to_fit();
+        exported_records.shrink_to_fit();
         types.shrink_to_fit();
         exported_types.shrink_to_fit();
         optional_callbacks.shrink_to_fit();

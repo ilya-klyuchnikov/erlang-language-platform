@@ -155,6 +155,10 @@ impl FormList {
         self.data.record_imports.iter()
     }
 
+    pub fn record_exports(&self) -> impl Iterator<Item = (ExportRecordId, &ExportRecord)> {
+        self.data.record_exports.iter()
+    }
+
     pub fn pp_stack(&self) -> &Arena<PPDirective> {
         &self.data.pp_directives
     }
@@ -237,6 +241,7 @@ impl FormList {
             FormIdx::DeprecatedAttribute(idx) => Form::DeprecatedAttribute(&self[idx]),
             FormIdx::FeatureAttribute(idx) => Form::FeatureAttribute(&self[idx]),
             FormIdx::ImportRecord(idx) => Form::ImportRecord(&self[idx]),
+            FormIdx::ExportRecord(idx) => Form::ExportRecord(&self[idx]),
             FormIdx::SsrDefinition(idx) => Form::SsrDefinition(&self[idx]),
         }
     }
@@ -339,6 +344,7 @@ pub(crate) struct FormListData {
     name_entries: Arena<NameEntry>,
     deprecates: Arena<DeprecatedAttribute>,
     record_imports: Arena<ImportRecord>,
+    record_exports: Arena<ExportRecord>,
     ssr_definitions: Arena<SsrDefinition>,
     pub condition_envs: Arena<ConditionEnv>,
 }
@@ -374,6 +380,7 @@ impl FormListData {
             name_entries,
             deprecates,
             record_imports,
+            record_exports,
             ssr_definitions,
             condition_envs,
         } = self;
@@ -404,6 +411,7 @@ impl FormListData {
         name_entries.shrink_to_fit();
         deprecates.shrink_to_fit();
         record_imports.shrink_to_fit();
+        record_exports.shrink_to_fit();
         ssr_definitions.shrink_to_fit();
         condition_envs.shrink_to_fit();
     }
@@ -433,6 +441,7 @@ pub enum FormIdx {
     DeprecatedAttribute(DeprecatedAttributeId),
     FeatureAttribute(FeatureAttributeId),
     ImportRecord(ImportRecordId),
+    ExportRecord(ExportRecordId),
     SsrDefinition(SsrDefinitionId),
 }
 
@@ -460,6 +469,7 @@ pub enum Form<'a> {
     DeprecatedAttribute(&'a DeprecatedAttribute),
     FeatureAttribute(&'a FeatureAttribute),
     ImportRecord(&'a ImportRecord),
+    ExportRecord(&'a ExportRecord),
     SsrDefinition(&'a SsrDefinition),
 }
 
@@ -489,6 +499,7 @@ impl<'a> Form<'a> {
             Form::DeprecatedAttribute(f) => f.form_id().upcast(),
             Form::FeatureAttribute(f) => f.form_id.upcast(),
             Form::ImportRecord(f) => f.form_id.upcast(),
+            Form::ExportRecord(f) => f.form_id.upcast(),
             Form::SsrDefinition(f) => f.form_id.upcast(),
         }
     }
@@ -536,6 +547,7 @@ impl<'a> Form<'a> {
             },
             Form::FeatureAttribute(f) => Some(&f.pp_ctx),
             Form::ImportRecord(f) => Some(&f.pp_ctx),
+            Form::ExportRecord(f) => Some(&f.pp_ctx),
             Form::SsrDefinition(f) => Some(&f.pp_ctx),
         }
     }
@@ -567,6 +579,7 @@ pub type FaEntryId = Idx<FaEntry>;
 pub type NameEntryId = Idx<NameEntry>;
 pub type DeprecatedAttributeId = Idx<DeprecatedAttribute>;
 pub type ImportRecordId = Idx<ImportRecord>;
+pub type ExportRecordId = Idx<ExportRecord>;
 pub type FeatureAttributeId = Idx<FeatureAttribute>;
 pub type SsrDefinitionId = Idx<SsrDefinition>;
 pub type ConditionEnvId = Idx<ConditionEnv>;
@@ -829,6 +842,14 @@ impl Index<ImportRecordId> for FormList {
 
     fn index(&self, index: ImportRecordId) -> &Self::Output {
         &self.data.record_imports[index]
+    }
+}
+
+impl Index<ExportRecordId> for FormList {
+    type Output = ExportRecord;
+
+    fn index(&self, index: ExportRecordId) -> &Self::Output {
+        &self.data.record_exports[index]
     }
 }
 
@@ -1262,4 +1283,12 @@ pub struct ImportRecord {
     pub entries: IdxRange<NameEntry>,
     pub pp_ctx: FormPPContext,
     pub form_id: FormId<ast::ImportRecordAttribute>,
+}
+
+/// -export_record([Name1, Name2]).
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ExportRecord {
+    pub entries: IdxRange<NameEntry>,
+    pub pp_ctx: FormPPContext,
+    pub form_id: FormId<ast::ExportRecordAttribute>,
 }

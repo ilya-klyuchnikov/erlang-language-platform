@@ -45,6 +45,7 @@ use crate::DefineId;
 use crate::Diagnostic;
 use crate::DiagnosticMessage;
 use crate::Export;
+use crate::ExportRecord;
 use crate::FaEntry;
 use crate::FaEntryId;
 use crate::FormList;
@@ -142,8 +143,9 @@ impl<'a> Ctx<'a> {
                     ast::Form::ImportRecordAttribute(import_record) => {
                         self.lower_import_record(import_record)
                     }
-                    // TODO: (T262108365) minimal for now, implemented in next commit
-                    ast::Form::ExportRecordAttribute(_) => None,
+                    ast::Form::ExportRecordAttribute(export_record) => {
+                        self.lower_export_record(export_record)
+                    }
                     ast::Form::Opaque(opaque) => self.lower_opaque(opaque),
                     ast::Form::OptionalCallbacksAttribute(cbs) => {
                         self.lower_optional_callbacks(cbs)
@@ -601,6 +603,21 @@ impl<'a> Ctx<'a> {
             form_id,
         };
         Some(FormIdx::ImportRecord(self.data.record_imports.alloc(res)))
+    }
+
+    fn lower_export_record(
+        &mut self,
+        export_record: &ast::ExportRecordAttribute,
+    ) -> Option<FormIdx> {
+        let entries = self.lower_name_entries(export_record.records());
+        let pp_ctx = self.current_pp_ctx();
+        let form_id = self.id_map.get_id(export_record);
+        let res = ExportRecord {
+            entries,
+            pp_ctx,
+            form_id,
+        };
+        Some(FormIdx::ExportRecord(self.data.record_exports.alloc(res)))
     }
 
     fn lower_name_entries(

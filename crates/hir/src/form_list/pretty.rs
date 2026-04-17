@@ -28,6 +28,7 @@ use crate::Callback;
 use crate::CompileOption;
 use crate::Define;
 use crate::Export;
+use crate::ExportRecord;
 use crate::FaEntry;
 use crate::FormIdx;
 use crate::FormList;
@@ -97,6 +98,7 @@ impl Printer<'_> {
             }
             FormIdx::FeatureAttribute(idx) => self.print_feature_attribute(&self.forms[idx])?,
             FormIdx::ImportRecord(idx) => self.print_import_record(&self.forms[idx])?,
+            FormIdx::ExportRecord(idx) => self.print_export_record(&self.forms[idx])?,
             FormIdx::DeprecatedAttribute(idx) => self.print_deprecated(&self.forms[idx])?,
             FormIdx::SsrDefinition(idx) => self.print_ssr(&self.forms[idx])?,
         }
@@ -428,6 +430,11 @@ impl Printer<'_> {
     fn print_import_record(&mut self, import_record: &ImportRecord) -> fmt::Result {
         write!(self, "-import_record({}, ", import_record.from)?;
         self.print_name_entries(&import_record.entries, &import_record.pp_ctx)
+    }
+
+    fn print_export_record(&mut self, export_record: &ExportRecord) -> fmt::Result {
+        write!(self, "-export_record(")?;
+        self.print_name_entries(&export_record.entries, &export_record.pp_ctx)
     }
 
     fn print_name_entries(

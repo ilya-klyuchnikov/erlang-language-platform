@@ -283,6 +283,7 @@ fn is_file_used(
                 FormIdx::DeprecatedAttribute(_) => return true,
                 FormIdx::FeatureAttribute(_) => return true,
                 FormIdx::ImportRecord(_) => return true,
+                FormIdx::ExportRecord(_) => return true,
                 FormIdx::ModuleDocAttribute(_) => {}
                 FormIdx::ModuleDocMetadataAttribute(_) => {}
                 FormIdx::DocAttribute(_) => {}
