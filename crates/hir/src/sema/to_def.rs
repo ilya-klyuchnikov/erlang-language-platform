@@ -270,8 +270,16 @@ impl ToDef for ast::RecordFieldName {
         let record_expr = ast::Expr::cast(ast.value.syntax().parent()?)?;
         let (record, field_name) = resolve_record(sema, ast.file_id, &record_expr, None)?;
         let field_name = field_name?;
+        let def_map = sema.db.def_map(ast.file_id);
+        // First check locally-defined records
+        if let Some(record_def) = def_map.get_records().get(&record) {
+            return record_def.find_field(sema.db, &field_name);
+        }
+        // Then check imported records (via -import_record)
+        let module_name = def_map.get_imported_records().get(&record)?;
+        let module = resolve_module_name(sema, ast.file_id, module_name)?;
         sema.db
-            .def_map(ast.file_id)
+            .def_map(module.file.file_id)
             .get_records()
             .get(&record)?
             .find_field(sema.db, &field_name)
@@ -298,12 +306,19 @@ impl ToDef for ast::RecordField {
         };
         let (record, field_name) = resolve_record(sema, ast.file_id, &expr, Some(idx))?;
         let field_name = field_name?;
-        let def = sema
-            .db
-            .def_map(ast.file_id)
-            .get_records()
-            .get(&record)?
-            .find_field(sema.db, &field_name)?;
+        let def_map = sema.db.def_map(ast.file_id);
+        let record_def = if let Some(rd) = def_map.get_records().get(&record) {
+            rd.clone()
+        } else {
+            let module_name = def_map.get_imported_records().get(&record)?;
+            let module = resolve_module_name(sema, ast.file_id, module_name)?;
+            sema.db
+                .def_map(module.file.file_id)
+                .get_records()
+                .get(&record)?
+                .clone()
+        };
+        let def = record_def.find_field(sema.db, &field_name)?;
 
         Some(DefinitionOrReference::Reference(def))
     }

@@ -3266,4 +3266,77 @@ pub(crate) mod tests {
             "#,
         );
     }
+
+    #[test]
+    fn test_rename_record_field_with_import_record() {
+        // Rename a record field should also update usages
+        // in modules that import the record
+        check_rename(
+            "new_field",
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -export_record([my_rec]).
+            -record(my_rec, {ol~d_field, other}).
+
+            //- /src/user.erl
+            -module(user).
+            -import_record(definer, [my_rec]).
+            foo() -> #my_rec{old_field = 1, other = 2}.
+            bar(#my_rec{old_field = X}) -> X.
+            "#,
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -export_record([my_rec]).
+            -record(my_rec, {new_field, other}).
+
+            //- /src/user.erl
+            -module(user).
+            -import_record(definer, [my_rec]).
+            foo() -> #my_rec{new_field = 1, other = 2}.
+            bar(#my_rec{new_field = X}) -> X.
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_rename_native_record_multiple_importers() {
+        // Rename should update all modules that import the record
+        check_rename(
+            "new_rec",
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -export_record([my_rec]).
+            -record(my_~rec, {a, b}).
+
+            //- /src/user1.erl
+            -module(user1).
+            -import_record(definer, [my_rec]).
+            foo() -> #my_rec{a = 1, b = 2}.
+
+            //- /src/user2.erl
+            -module(user2).
+            -import_record(definer, [my_rec]).
+            bar(#my_rec{a = A}) -> A.
+            "#,
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -export_record([new_rec]).
+            -record(new_rec, {a, b}).
+
+            //- /src/user1.erl
+            -module(user1).
+            -import_record(definer, [new_rec]).
+            foo() -> #new_rec{a = 1, b = 2}.
+
+            //- /src/user2.erl
+            -module(user2).
+            -import_record(definer, [new_rec]).
+            bar(#new_rec{a = A}) -> A.
+            "#,
+        );
+    }
 }

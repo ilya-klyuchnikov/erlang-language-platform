@@ -339,7 +339,7 @@ impl SymbolDefinition {
         match self {
             SymbolDefinition::Function(fun) => !fun.exported,
             SymbolDefinition::Record(rec) => !rec.exported,
-            SymbolDefinition::RecordField(_) => true,
+            SymbolDefinition::RecordField(field) => !field.record.exported,
             SymbolDefinition::Type(ty) => !ty.exported,
             SymbolDefinition::Callback(_) => true,
             SymbolDefinition::Define(_) => true,
