@@ -703,9 +703,12 @@ foo() -> another:imp~orted().
 //- /foo/src/main.erl app:foo
 -module(main).
 -import_record(another, [my_r~ec]).
+%%                       ^^^^^^
 
 //- /foo/src/another.erl app:foo
 -module(another).
+-export_record([my_rec]).
+%%              ^^^^^^
 -record(my_rec, {field}).
 %%      ^^^^^^def
 "#,

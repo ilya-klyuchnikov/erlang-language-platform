@@ -495,6 +495,7 @@ fn arg_name(arg_idx: usize, expr: ast::Expr) -> SpecArgName {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RecordDef {
     pub file: File,
+    pub exported: bool,
     pub record: Record,
 }
 

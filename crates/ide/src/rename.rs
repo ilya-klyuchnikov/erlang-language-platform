@@ -3169,4 +3169,101 @@ pub(crate) mod tests {
             "#,
         );
     }
+
+    #[test]
+    fn test_rename_native_record_simple() {
+        // Rename a record defined via -record, used as a native record
+        // via import_record. The rename should update the definition,
+        // the export_record, the import_record, and all usages.
+        check_rename(
+            "new_rec",
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -export_record([my_rec]).
+            -record(my_~rec, {a, b}).
+
+            //- /src/user.erl
+            -module(user).
+            -import_record(definer, [my_rec]).
+            foo() -> #my_rec{a = 1, b = 2}.
+            "#,
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -export_record([new_rec]).
+            -record(new_rec, {a, b}).
+
+            //- /src/user.erl
+            -module(user).
+            -import_record(definer, [new_rec]).
+            foo() -> #new_rec{a = 1, b = 2}.
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_rename_native_record_unexported() {
+        // Rename a record that is NOT exported via -export_record.
+        // The rename should only affect the defining file.
+        // Another module defines and exports a record with the same
+        // name — it must not be touched by the rename.
+        check_rename(
+            "new_rec",
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -record(my_~rec, {a, b}).
+            foo() -> #my_rec{a = 1}.
+
+            //- /src/other.erl
+            -module(other).
+            -export_record([my_rec]).
+            -record(my_rec, {x, y}).
+            bar() -> #my_rec{x = 1}.
+            "#,
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -record(new_rec, {a, b}).
+            foo() -> #new_rec{a = 1}.
+
+            //- /src/other.erl
+            -module(other).
+            -export_record([my_rec]).
+            -record(my_rec, {x, y}).
+            bar() -> #my_rec{x = 1}.
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_rename_native_record_from_import_record() {
+        // Rename triggered from the record name in import_record
+        check_rename(
+            "new_rec",
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -export_record([my_rec]).
+            -record(my_rec, {a, b}).
+
+            //- /src/user.erl
+            -module(user).
+            -import_record(definer, [my_~rec]).
+            foo() -> #my_rec{a = 1, b = 2}.
+            "#,
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -export_record([new_rec]).
+            -record(new_rec, {a, b}).
+
+            //- /src/user.erl
+            -module(user).
+            -import_record(definer, [new_rec]).
+            foo() -> #new_rec{a = 1, b = 2}.
+            "#,
+        );
+    }
 }

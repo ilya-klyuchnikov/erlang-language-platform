@@ -245,8 +245,16 @@ impl ToDef for ast::RecordName {
     fn to_def(sema: &Semantic<'_>, ast: InFile<&Self>) -> Option<Self::Def> {
         let record_expr = ast::Expr::cast(ast.value.syntax().parent()?)?;
         let (record, _) = resolve_record(sema, ast.file_id, &record_expr, None)?;
+        let def_map = sema.db.def_map(ast.file_id);
+        // First check locally-defined records
+        if let Some(def) = def_map.get_records().get(&record) {
+            return Some(def.clone());
+        }
+        // Then check imported records (via -import_record)
+        let module_name = def_map.get_imported_records().get(&record)?;
+        let module = resolve_module_name(sema, ast.file_id, module_name)?;
         sema.db
-            .def_map(ast.file_id)
+            .def_map(module.file.file_id)
             .get_records()
             .get(&record)
             .cloned()

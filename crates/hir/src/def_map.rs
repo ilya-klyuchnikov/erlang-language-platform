@@ -262,9 +262,14 @@ impl DefMap {
                 }
                 FormIdx::Record(idx) => {
                     let record = form_list[idx].clone();
-                    def_map
-                        .records
-                        .insert(record.name.clone(), RecordDef { file, record });
+                    def_map.records.insert(
+                        record.name.clone(),
+                        RecordDef {
+                            file,
+                            exported: false,
+                            record,
+                        },
+                    );
                 }
                 FormIdx::PPDirective(idx) => match &form_list[idx] {
                     PPDirective::Define(define_id) => {
@@ -641,6 +646,14 @@ impl DefMap {
         self.records.get(name)
     }
 
+    pub fn get_imported_records(&self) -> &FxHashMap<Name, Name> {
+        &self.imported_records
+    }
+
+    pub fn get_exported_records(&self) -> &FxHashSet<Name> {
+        &self.exported_records
+    }
+
     pub fn get_macros(&self) -> &FxHashMap<MacroName, DefineDef> {
         &self.macros
     }
@@ -896,6 +909,10 @@ impl DefMap {
 
         for (name, type_def) in self.types.iter_mut() {
             type_def.exported |= self.exported_types.contains(name)
+        }
+
+        for (name, record_def) in self.records.iter_mut() {
+            record_def.exported |= self.exported_records.contains(name)
         }
     }
 

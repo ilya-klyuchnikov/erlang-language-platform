@@ -338,7 +338,7 @@ impl SymbolDefinition {
     pub fn is_local(&self) -> bool {
         match self {
             SymbolDefinition::Function(fun) => !fun.exported,
-            SymbolDefinition::Record(_) => true,
+            SymbolDefinition::Record(rec) => !rec.exported,
             SymbolDefinition::RecordField(_) => true,
             SymbolDefinition::Type(ty) => !ty.exported,
             SymbolDefinition::Callback(_) => true,
