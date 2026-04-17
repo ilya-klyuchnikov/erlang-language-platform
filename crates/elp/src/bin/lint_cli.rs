@@ -35,6 +35,7 @@ use elp_ide::Analysis;
 use elp_ide::AnalysisHost;
 use elp_ide::diagnostics;
 use elp_ide::diagnostics::DiagnosticsConfig;
+use elp_ide::diagnostics::DiagnosticsTrigger;
 use elp_ide::diagnostics::EnabledDiagnostics;
 use elp_ide::diagnostics::LintConfig;
 use elp_ide::diagnostics::RemoveElpReported;
@@ -321,7 +322,7 @@ fn do_diagnostics_one(
     args: &Lint,
 ) -> Result<Option<(String, FileId, DiagnosticCollection)>> {
     let mut diagnostics = DiagnosticCollection::default();
-    let native = db.native_diagnostics(config, &vec![], file_id)?;
+    let native = db.native_diagnostics(config, &DiagnosticsTrigger::Cli, &vec![], file_id)?;
     diagnostics.set_native(file_id, native);
     if args.include_erlc_diagnostics || config.request_erlang_service_diagnostics {
         let erlang_service =

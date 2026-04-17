@@ -16,6 +16,7 @@ use call_hierarchy::CallItem;
 use diagnostics::AdhocSemanticDiagnostics;
 use diagnostics::Diagnostic;
 use diagnostics::DiagnosticsConfig;
+use diagnostics::DiagnosticsTrigger;
 use diagnostics::LabeledDiagnostics;
 use diagnostics::RemoveElpReported;
 use diagnostics_collection::DiagnosticCollection;
@@ -264,11 +265,18 @@ impl Analysis {
     pub fn native_diagnostics(
         &self,
         config: &DiagnosticsConfig,
+        trigger: &DiagnosticsTrigger,
         adhoc_semantic_diagnostics: &Vec<&dyn AdhocSemanticDiagnostics>,
         file_id: FileId,
     ) -> Cancellable<LabeledDiagnostics> {
         self.with_db(|db| {
-            diagnostics::native_diagnostics(db, config, adhoc_semantic_diagnostics, file_id)
+            diagnostics::native_diagnostics(
+                db,
+                config,
+                trigger,
+                adhoc_semantic_diagnostics,
+                file_id,
+            )
         })
     }
 
@@ -518,6 +526,7 @@ impl Analysis {
                 diagnostics::native_diagnostics(
                     db,
                     diagnostics_config,
+                    &DiagnosticsTrigger::Cli,
                     adhoc_semantic_diagnostics,
                     frange.file_id,
                 )

@@ -18,6 +18,7 @@ use elp_eqwalizer::types::Type;
 use elp_ide::Analysis;
 use elp_ide::diagnostics;
 use elp_ide::diagnostics::DiagnosticsConfig;
+use elp_ide::diagnostics::DiagnosticsTrigger;
 use elp_ide::diagnostics::LabeledDiagnostics;
 use elp_ide::diagnostics::RemoveElpReported;
 use elp_ide::diagnostics_collection::DiagnosticCollection;
@@ -210,6 +211,7 @@ impl Snapshot {
         &self,
         file_id: FileId,
         include_otp: bool,
+        trigger: &DiagnosticsTrigger,
     ) -> Option<LabeledDiagnostics> {
         if !include_otp && self.is_otp(file_id) {
             return None;
@@ -219,7 +221,7 @@ impl Snapshot {
         let _timer = timeit_with_telemetry!(TelemetryData::NativeDiagnostics { file_url });
 
         self.analysis
-            .native_diagnostics(&self.diagnostics_config.clone(), &vec![], file_id)
+            .native_diagnostics(&self.diagnostics_config.clone(), trigger, &vec![], file_id)
             .ok()
     }
 

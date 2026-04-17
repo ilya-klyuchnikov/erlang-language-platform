@@ -32,6 +32,7 @@ use elp_ide::Analysis;
 use elp_ide::AnalysisHost;
 use elp_ide::diagnostics;
 use elp_ide::diagnostics::DiagnosticsConfig;
+use elp_ide::diagnostics::DiagnosticsTrigger;
 use elp_ide::diagnostics::LabeledDiagnostics;
 use elp_ide::diagnostics::LintConfig;
 use elp_ide::diagnostics_collection::DiagnosticCollection;
@@ -573,10 +574,15 @@ impl Server {
         self.record_highest_file_id(highest_file_id);
 
         if self.status == Status::Running {
-            if mem::take(&mut self.native_diagnostics_requested)
-                || (!self.config.native_diagnostics_on_save_only() && changed)
-            {
-                self.update_native_diagnostics();
+            let save_requested = mem::take(&mut self.native_diagnostics_requested);
+            let change_triggered = !self.config.native_diagnostics_on_save_only() && changed;
+            if save_requested || change_triggered {
+                let trigger = if save_requested {
+                    DiagnosticsTrigger::Save
+                } else {
+                    DiagnosticsTrigger::Change
+                };
+                self.update_native_diagnostics(trigger);
             }
 
             if mem::take(&mut self.eqwalizer_and_erlang_service_diagnostics_requested) {
@@ -1179,16 +1185,18 @@ impl Server {
             .collect()
     }
 
-    fn update_native_diagnostics(&mut self) {
+    fn update_native_diagnostics(&mut self, trigger: DiagnosticsTrigger) {
         let opened_documents = self.opened_documents();
         let snapshot = self.snapshot();
-
         let include_otp = self.config.enable_otp_diagnostics();
         self.task_pool.handle.spawn(move || {
             let diagnostics = opened_documents
                 .into_par_iter()
                 .map_with(snapshot, |snapshot, file_id| {
-                    (file_id, snapshot.native_diagnostics(file_id, include_otp))
+                    (
+                        file_id,
+                        snapshot.native_diagnostics(file_id, include_otp, &trigger),
+                    )
                 })
                 .filter_map(|(file_id, diags)| Some((file_id, diags?)))
                 .collect();

@@ -604,6 +604,15 @@ pub(crate) trait Linter {
     fn should_process_file_id(&self, _sema: &Semantic, _file_id: FileId) -> bool {
         true
     }
+
+    // Specify if the linter should only run on save events (not on every keystroke)
+    // in IDE/server mode. Linters performing heavy computation (e.g. evaluating
+    // Erlang callbacks via the erlang service) should return true.
+    // This has no effect in CLI mode (`elp lint`), where all linters always run.
+    // Default: false (runs on every change).
+    fn runs_on_save_only(&self) -> bool {
+        false
+    }
 }
 
 fn should_process_app(
@@ -630,6 +639,7 @@ fn should_process_app(
 fn should_run(
     linter: &dyn Linter,
     config: &DiagnosticsConfig,
+    trigger: &DiagnosticsTrigger,
     app_name: &Option<AppName>,
     is_generated: bool,
     is_test: bool,
@@ -638,6 +648,16 @@ fn should_run(
         && *filter != linter.id()
         && !config.recursive
     {
+        return false;
+    }
+    let runs_on_save_only = if let Some(lint_config) = config.lint_config.as_ref() {
+        lint_config
+            .get_runs_on_save_only_override(&linter.id())
+            .unwrap_or_else(|| linter.runs_on_save_only())
+    } else {
+        linter.runs_on_save_only()
+    };
+    if runs_on_save_only && *trigger == DiagnosticsTrigger::Change {
         return false;
     }
     if !should_process_app(app_name, config, &linter.id()) {
@@ -1154,6 +1174,17 @@ impl EnabledDiagnostics {
     }
 }
 
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
+pub enum DiagnosticsTrigger {
+    /// CLI invocations (elp lint, elp parse-all, etc.) — always runs all linters.
+    #[default]
+    Cli,
+    /// LSP server: triggered by didOpen or didSave — runs all linters.
+    Save,
+    /// LSP server: triggered by didChange (keystroke) — skips save-only linters.
+    Change,
+}
+
 #[derive(Default, Clone, Debug)]
 pub struct DiagnosticsConfig {
     pub experimental: bool,
@@ -1372,6 +1403,11 @@ impl LintConfig {
             .and_then(|c| c.exclude_apps.clone())
     }
 
+    /// Get the runs_on_save_only override for a linter based on its diagnostic code.
+    pub fn get_runs_on_save_only_override(&self, diagnostic_code: &DiagnosticCode) -> Option<bool> {
+        self.linters.get(diagnostic_code)?.runs_on_save_only
+    }
+
     pub fn get_function_call_linter_config(
         &self,
         diagnostic_code: &DiagnosticCode,
@@ -1496,6 +1532,7 @@ pub struct LinterConfig {
     pub include_generated: Option<bool>,
     pub experimental: Option<bool>,
     pub exclude_apps: Option<Vec<String>>,
+    pub runs_on_save_only: Option<bool>,
     #[serde(flatten)]
     pub config: Option<LinterTraitConfig>,
 }
@@ -1517,6 +1554,7 @@ impl LinterConfig {
             include_generated: other.include_generated.or(self.include_generated),
             experimental: other.experimental.or(self.experimental),
             exclude_apps: other.exclude_apps.or(self.exclude_apps),
+            runs_on_save_only: other.runs_on_save_only.or(self.runs_on_save_only),
             config: merged_config,
         }
     }
@@ -1653,6 +1691,7 @@ pub fn eqwalizer_to_diagnostic(
 pub fn native_diagnostics(
     db: &RootDatabase,
     config: &DiagnosticsConfig,
+    trigger: &DiagnosticsTrigger,
     adhoc_semantic_diagnostics: &Vec<&dyn AdhocSemanticDiagnostics>,
     file_id: FileId,
 ) -> LabeledDiagnostics {
@@ -1691,7 +1730,7 @@ pub fn native_diagnostics(
             config,
             &diagnostics_descriptors(),
         );
-        diagnostics_from_linters(&mut res, &sema, file_id, config, linters());
+        diagnostics_from_linters(&mut res, &sema, file_id, config, trigger, linters());
 
         let parse_diagnostics = parse.errors().iter().take(128).map(|err| {
             let (code, message) = match err {
@@ -1940,6 +1979,7 @@ fn diagnostics_from_linters(
     sema: &Semantic,
     file_id: FileId,
     config: &DiagnosticsConfig,
+    trigger: &DiagnosticsTrigger,
     linters: Vec<DiagnosticLinter>,
 ) {
     let generated_status = sema.db.generated_status(file_id);
@@ -1968,7 +2008,14 @@ fn diagnostics_from_linters(
         };
 
         if linter.should_process_file_id(sema, file_id)
-            && should_run(linter, config, &app_name, effective_is_generated, is_test)
+            && should_run(
+                linter,
+                config,
+                trigger,
+                &app_name,
+                effective_is_generated,
+                is_test,
+            )
         {
             let severity = if let Some(lint_config) = config.lint_config.as_ref() {
                 lint_config
@@ -4098,6 +4145,7 @@ main(X) ->
                 include_generated: None,
                 experimental: None,
                 exclude_apps: None,
+                runs_on_save_only: None,
                 config: None,
             },
         );
@@ -4136,6 +4184,7 @@ main(X) ->
                 include_generated: None,
                 experimental: None,
                 exclude_apps: None,
+                runs_on_save_only: None,
                 config: None,
             },
         );
@@ -4173,6 +4222,7 @@ main(X) ->
                 include_generated: Some(true),
                 experimental: None,
                 exclude_apps: None,
+                runs_on_save_only: None,
                 config: None,
             },
         );
@@ -4211,6 +4261,7 @@ main(X) ->
                 include_generated: None,
                 experimental: Some(true),
                 exclude_apps: None,
+                runs_on_save_only: None,
                 config: None,
             },
         );
@@ -4251,6 +4302,7 @@ main(X) ->
                 include_generated: None,
                 experimental: None,
                 exclude_apps: None,
+                runs_on_save_only: None,
                 config: None,
             },
         );
@@ -4288,6 +4340,7 @@ main(X) ->
                 include_generated: None,
                 experimental: None,
                 exclude_apps: Some(vec!["my_app".to_string()]),
+                runs_on_save_only: None,
                 config: None,
             },
         );
@@ -4360,6 +4413,7 @@ main(X) ->
                 include_generated: None,
                 experimental: None,
                 exclude_apps: None,
+                runs_on_save_only: None,
                 config: Some(LinterTraitConfig::FunctionCallLinterConfig(
                     FunctionCallLinterConfig {
                         include: Some(vec![FunctionMatch::mf("mod_a", "func_a")]),
@@ -4393,6 +4447,7 @@ main(X) ->
                 include_generated: None,
                 experimental: None,
                 exclude_apps: None,
+                runs_on_save_only: None,
                 config: Some(LinterTraitConfig::FunctionCallLinterConfig(
                     FunctionCallLinterConfig {
                         include: Some(vec![FunctionMatch::mf("mod_b", "func_b")]),
@@ -4411,6 +4466,7 @@ main(X) ->
                 include_generated: Some(true),
                 experimental: None,
                 exclude_apps: None,
+                runs_on_save_only: None,
                 config: None,
             },
         );

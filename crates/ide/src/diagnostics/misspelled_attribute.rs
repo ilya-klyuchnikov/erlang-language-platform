@@ -186,6 +186,7 @@ mod tests {
     use expect_test::expect;
 
     use crate::diagnostics::DiagnosticsConfig;
+    use crate::diagnostics::DiagnosticsTrigger;
     use crate::fixture;
     use crate::tests::check_diagnostics;
     use crate::tests::check_fix;
@@ -224,7 +225,12 @@ mod tests {
         let config =
             DiagnosticsConfig::default().disable(elp_ide_db::DiagnosticCode::NoDialyzerAttribute);
         let diags = analysis
-            .native_diagnostics(&config, &vec![], fixture.file_id())
+            .native_diagnostics(
+                &config,
+                &DiagnosticsTrigger::Cli,
+                &vec![],
+                fixture.file_id(),
+            )
             .unwrap();
         assert!(
             diags.is_empty(),
@@ -244,7 +250,12 @@ mod tests {
         );
         let config = DiagnosticsConfig::default();
         let diags = analysis
-            .native_diagnostics(&config, &vec![], fixture.file_id())
+            .native_diagnostics(
+                &config,
+                &DiagnosticsTrigger::Cli,
+                &vec![],
+                fixture.file_id(),
+            )
             .unwrap();
         assert!(
             diags.is_empty(),

@@ -29,6 +29,7 @@ use elp_eqwalizer::Mode;
 use elp_ide::Analysis;
 use elp_ide::diagnostics;
 use elp_ide::diagnostics::DiagnosticsConfig;
+use elp_ide::diagnostics::DiagnosticsTrigger;
 use elp_ide::diagnostics::LabeledDiagnostics;
 use elp_ide::diagnostics::RemoveElpReported;
 use elp_ide::diagnostics_collection::DiagnosticCollection;
@@ -400,7 +401,7 @@ fn do_parse_one(
     file_id: FileId,
     name: &str,
 ) -> Result<Option<ParseResult>> {
-    let native = db.native_diagnostics(config, &vec![], file_id)?;
+    let native = db.native_diagnostics(config, &DiagnosticsTrigger::Cli, &vec![], file_id)?;
     let erlang_service_diagnostics =
         db.erlang_service_diagnostics(file_id, config, RemoveElpReported::Yes)?;
     let line_index = db.line_index(file_id)?;

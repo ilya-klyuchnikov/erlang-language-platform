@@ -262,6 +262,7 @@ mod tests {
     use crate::DiagnosticsConfig;
     use crate::diagnostics;
     use crate::diagnostics::Diagnostic;
+    use crate::diagnostics::DiagnosticsTrigger;
     use crate::diagnostics::LabeledDiagnostics;
     use crate::diagnostics::Severity;
     use crate::diagnostics::attach_related_diagnostics;
@@ -334,7 +335,13 @@ mod tests {
         let (db, fixture) = RootDatabase::with_fixture(elp_fixture);
         for file_id in &fixture.files {
             let file_id = *file_id;
-            let diagnostics = diagnostics::native_diagnostics(&db, &config, &vec![], file_id);
+            let diagnostics = diagnostics::native_diagnostics(
+                &db,
+                &config,
+                &DiagnosticsTrigger::Cli,
+                &vec![],
+                file_id,
+            );
 
             let combined = attach_related_diagnostics(file_id, diagnostics, extra_diags.clone());
             let expected = fixture.annotations_by_file_id(&file_id);

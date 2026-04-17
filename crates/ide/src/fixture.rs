@@ -23,6 +23,7 @@ use crate::AnalysisHost;
 use crate::FilePosition;
 use crate::diagnostics::AdhocSemanticDiagnostics;
 use crate::diagnostics::DiagnosticsConfig;
+use crate::diagnostics::DiagnosticsTrigger;
 use crate::diagnostics::RemoveElpReported;
 use crate::diagnostics_collection::DiagnosticCollection;
 
@@ -97,7 +98,12 @@ pub fn diagnostics_for(
         diagnostics.set_native(
             file_id,
             analysis
-                .native_diagnostics(config, adhoc_semantic_diagnostics, file_id)
+                .native_diagnostics(
+                    config,
+                    &DiagnosticsTrigger::Cli,
+                    adhoc_semantic_diagnostics,
+                    file_id,
+                )
                 .unwrap(),
         );
     }

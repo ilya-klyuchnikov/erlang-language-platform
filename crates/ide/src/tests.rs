@@ -34,6 +34,7 @@ use crate::diagnostics;
 use crate::diagnostics::AdhocSemanticDiagnostics;
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::DiagnosticCode;
+use crate::diagnostics::DiagnosticsTrigger;
 use crate::diagnostics::LabeledDiagnostics;
 use crate::diagnostics::Severity;
 use crate::fixture;
@@ -530,7 +531,13 @@ pub(crate) fn check_diagnostics_with_config_and_extra(
     let analysis = host.analysis();
     for file_id in &fixture.files {
         let file_id = *file_id;
-        let diagnostics = diagnostics::native_diagnostics(&analysis.db, &config, &vec![], file_id);
+        let diagnostics = diagnostics::native_diagnostics(
+            &analysis.db,
+            &config,
+            &DiagnosticsTrigger::Cli,
+            &vec![],
+            file_id,
+        );
         let diagnostics =
             diagnostics::attach_related_diagnostics(file_id, diagnostics, extra_diags.clone());
 
@@ -558,7 +565,12 @@ pub fn check_no_parse_errors_with_config(
     adhoc_semantic_diagnostics: &Vec<&dyn AdhocSemanticDiagnostics>,
 ) {
     let diags = analysis
-        .native_diagnostics(config, adhoc_semantic_diagnostics, file_id)
+        .native_diagnostics(
+            config,
+            &DiagnosticsTrigger::Cli,
+            adhoc_semantic_diagnostics,
+            file_id,
+        )
         .unwrap();
     assert!(
         diags.is_empty(),
