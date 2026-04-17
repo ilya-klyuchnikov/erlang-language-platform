@@ -3099,4 +3099,45 @@ pub(crate) mod tests {
             "#,
         );
     }
+
+    // ---------------------------------
+    // Native record field renaming (EEP 79 / OTP 29)
+    // ---------------------------------
+
+    #[test]
+    fn test_rename_record_field_simple() {
+        // Rename a record field - should update the definition
+        // and all usages of the field
+        check_rename(
+            "new_field",
+            r#"
+            -record(my_rec, {ol~d_field, other}).
+            foo() -> #my_rec{old_field = 1, other = 2}.
+            bar(#my_rec{old_field = X}) -> X.
+            baz(R) -> R#my_rec.old_field.
+            "#,
+            r#"
+            -record(my_rec, {new_field, other}).
+            foo() -> #my_rec{new_field = 1, other = 2}.
+            bar(#my_rec{new_field = X}) -> X.
+            baz(R) -> R#my_rec.new_field.
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_rename_record_field_in_spec() {
+        // Rename a record field should update usages in type specs
+        check_rename(
+            "new_field",
+            r#"
+            -record(my_rec, {ol~d_field :: integer(), other :: atom()}).
+            -type my_rec() :: #my_rec{old_field :: pos_integer()}.
+            "#,
+            r#"
+            -record(my_rec, {new_field :: integer(), other :: atom()}).
+            -type my_rec() :: #my_rec{new_field :: pos_integer()}.
+            "#,
+        );
+    }
 }

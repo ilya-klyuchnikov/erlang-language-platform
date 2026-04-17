@@ -97,6 +97,20 @@ pub fn is_valid_macro_name(new_name: &String) -> bool {
     )
 }
 
+// Delegate checking record field name validity to the parser.
+// Record field names are atoms, so we reuse the function name check.
+pub fn is_valid_record_field_name(new_name: &String) -> bool {
+    let parse = ast::SourceFile::parse_text(format!("-record(r, {{{new_name}}}).").as_str());
+    match parse.tree().forms().next() {
+        Some(ast::Form::RecordDecl(decl)) => decl
+            .fields()
+            .next()
+            .and_then(|f| f.name())
+            .is_some_and(|name| name.syntax().text().to_string() == *new_name),
+        _ => false,
+    }
+}
+
 // Delegate checking type name validity to the parser
 pub fn is_valid_type_name(new_name: &String) -> bool {
     let parse = ast::SourceFile::parse_text(format!("-type {new_name}() :: ok.").as_str());
@@ -162,8 +176,22 @@ impl SymbolDefinition {
             SymbolDefinition::Record(_) => {
                 rename_error!("Cannot rename record")
             }
-            SymbolDefinition::RecordField(_) => {
-                rename_error!("Cannot rename record field")
+            SymbolDefinition::RecordField(ref field_def) => {
+                if safety_check == SafetyChecks::Yes && !is_valid_record_field_name(new_name) {
+                    rename_error!("Invalid new record field name: '{}'", new_name);
+                }
+
+                if safety_check == SafetyChecks::Yes
+                    && !is_safe_record_field(sema, field_def, new_name)
+                {
+                    rename_error!(
+                        "Field '{}' already exists in record '{}'",
+                        new_name,
+                        field_def.record.record.name.raw()
+                    );
+                }
+
+                self.rename_reference(sema, new_name, parens_needed_in_context, safety_check)
             }
             SymbolDefinition::Type(type_alias) => {
                 if safety_check == SafetyChecks::Yes && !is_valid_type_name(new_name) {
@@ -264,6 +292,15 @@ impl SymbolDefinition {
                     range,
                 })
             }
+            SymbolDefinition::RecordField(field_def) => {
+                let source = field_def.source(sema.db.upcast());
+                let name = source.name()?;
+                let range = name.syntax().text_range();
+                Some(FileRange {
+                    file_id: field_def.record.file.file_id,
+                    range,
+                })
+            }
             _ => None,
         }
     }
@@ -351,6 +388,22 @@ impl SymbolDefinition {
 
                 // Also need to rename the definition itself
                 // Get the type definition location
+                let (file_id, def_edit) = source_edit_from_def(sema, self.clone(), new_name)?;
+                source_change.insert_source_edit(file_id, def_edit);
+
+                source_edit_from_usages(
+                    &mut source_change,
+                    usages.iter().collect(),
+                    new_name,
+                    parens_needed_in_context,
+                );
+                Ok(source_change)
+            }
+            SymbolDefinition::RecordField(_field_def) => {
+                // Find all usages of the record field
+                let usages = self.clone().usages(sema).all();
+
+                // Also need to rename the definition itself
                 let (file_id, def_edit) = source_edit_from_def(sema, self.clone(), new_name)?;
                 source_change.insert_source_edit(file_id, def_edit);
 
@@ -792,6 +845,21 @@ pub fn is_safe_type(sema: &Semantic, file_id: FileId, new_name: &str, arity: u32
             // A type is considered different if either the name or arity differs
             *name.name().to_string() != *new_name || name.arity() != arity
         })
+}
+
+/// Check that the new record field name doesn't already exist in the same record.
+pub fn is_safe_record_field(
+    sema: &Semantic,
+    field_def: &hir::RecordFieldDef,
+    new_name: &str,
+) -> bool {
+    let forms = sema.db.file_form_list(field_def.record.file.file_id);
+    field_def
+        .record
+        .record
+        .fields
+        .clone()
+        .all(|field_id| forms[field_id].name.raw() != new_name)
 }
 
 /// Check that the new function name is not in scope already in the
