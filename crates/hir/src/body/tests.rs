@@ -3597,3 +3597,31 @@ foo(#_{a = A}) -> A.
         "#]],
     );
 }
+
+#[test]
+fn native_record_qualified_in_type() {
+    check(
+        r#"
+-type foo() :: #mod:name{a :: integer()}.
+"#,
+        expect![[r#"
+            -type foo() :: #mod:name{
+                a :: erlang:integer()
+            }.
+        "#]],
+    );
+}
+
+#[test]
+fn native_record_anon_in_type() {
+    check(
+        r#"
+-type foo() :: #_{a :: integer()}.
+"#,
+        expect![[r#"
+            -type foo() :: #_{
+                a :: erlang:integer()
+            }.
+        "#]],
+    );
+}

@@ -775,6 +775,13 @@ impl<'a> Printer<'a> {
                     this.print_type(&this.body[*val])
                 })
             }
+            TypeExpr::NativeRecord { name, fields } => {
+                self.print_native_record_name(name)?;
+                self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
+                    write!(this, "{} :: ", this.db.lookup_atom(*key))?;
+                    this.print_type(&this.body[*val])
+                })
+            }
             TypeExpr::Fun(fun) => {
                 write!(self, "fun(")?;
                 match fun {

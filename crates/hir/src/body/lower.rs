@@ -1268,8 +1268,8 @@ impl<'a> Ctx<'a> {
                 let name = record
                     .name()
                     .and_then(|n| self.lower_qualified_record_name(&n));
+                let fields = self.lower_record_fields(record.fields());
                 if let Some(name) = name {
-                    let fields = self.lower_record_fields(record.fields());
                     self.alloc_expr(Expr::NativeRecord { name, fields }, Some(expr))
                 } else {
                     self.alloc_expr(Expr::Missing, Some(expr))
@@ -1301,8 +1301,8 @@ impl<'a> Ctx<'a> {
                 let name = update
                     .name()
                     .and_then(|n| self.lower_qualified_record_name(&n));
+                let fields = self.lower_record_fields(update.fields());
                 if let Some(name) = name {
-                    let fields = self.lower_record_fields(update.fields());
                     self.alloc_expr(
                         Expr::NativeRecordUpdate {
                             expr: base,
@@ -2109,15 +2109,7 @@ impl<'a> Ctx<'a> {
             }
             ast::Expr::RecordExpr(record) => {
                 let name = record.name().and_then(|n| self.resolve_name(n.name()?));
-                let fields = record
-                    .fields()
-                    .flat_map(|field| {
-                        let ty =
-                            self.lower_optional_type_expr(field.ty().and_then(|expr| expr.expr()));
-                        let name = self.resolve_name(field.name()?)?;
-                        Some((name, ty))
-                    })
-                    .collect();
+                let fields = self.lower_record_fields_type(record.fields());
                 if let Some(name) = name {
                     self.alloc_type_expr(TypeExpr::Record { name, fields }, Some(expr))
                 } else {
@@ -2202,13 +2194,31 @@ impl<'a> Ctx<'a> {
                 let _ = self.lower_optional_type_expr(cond.rhs());
                 self.alloc_type_expr(TypeExpr::Missing, Some(expr))
             }
-            // TODO(T262108365): lower native records (EEP 79) properly
-            ast::Expr::AnonRecordExpr(_)
-            | ast::Expr::AnonRecordFieldExpr(_)
-            | ast::Expr::AnonRecordUpdateExpr(_)
-            | ast::Expr::QualifiedRecordExpr(_)
-            | ast::Expr::QualifiedRecordFieldExpr(_)
-            | ast::Expr::QualifiedRecordUpdateExpr(_) => {
+            ast::Expr::AnonRecordExpr(record) => {
+                let fields = self.lower_record_fields_type(record.fields());
+                self.alloc_type_expr(
+                    TypeExpr::NativeRecord {
+                        name: NativeRecordName::Anon,
+                        fields,
+                    },
+                    Some(expr),
+                )
+            }
+            ast::Expr::AnonRecordFieldExpr(_) | ast::Expr::AnonRecordUpdateExpr(_) => {
+                self.alloc_type_expr(TypeExpr::Missing, Some(expr))
+            }
+            ast::Expr::QualifiedRecordExpr(record) => {
+                let name = record
+                    .name()
+                    .and_then(|n| self.lower_qualified_record_name(&n));
+                let fields = self.lower_record_fields_type(record.fields());
+                if let Some(name) = name {
+                    self.alloc_type_expr(TypeExpr::NativeRecord { name, fields }, Some(expr))
+                } else {
+                    self.alloc_type_expr(TypeExpr::Missing, Some(expr))
+                }
+            }
+            ast::Expr::QualifiedRecordFieldExpr(_) | ast::Expr::QualifiedRecordUpdateExpr(_) => {
                 self.alloc_type_expr(TypeExpr::Missing, Some(expr))
             }
         }
@@ -3100,6 +3110,19 @@ impl<'a> Ctx<'a> {
                 let value = self.lower_optional_pat(field.expr().and_then(|expr| expr.expr()));
                 let name = self.resolve_name(field.name()?)?;
                 Some((name, value))
+            })
+            .collect()
+    }
+
+    fn lower_record_fields_type(
+        &mut self,
+        fields: impl Iterator<Item = ast::RecordField>,
+    ) -> Vec<(Atom, TypeExprId)> {
+        fields
+            .flat_map(|field| {
+                let ty = self.lower_optional_type_expr(field.ty().and_then(|expr| expr.expr()));
+                let name = self.resolve_name(field.name()?)?;
+                Some((name, ty))
             })
             .collect()
     }

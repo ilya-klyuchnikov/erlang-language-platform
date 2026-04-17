@@ -932,6 +932,10 @@ pub enum TypeExpr {
         name: Atom,
         fields: Vec<(Atom, TypeExprId)>,
     },
+    NativeRecord {
+        name: NativeRecordName,
+        fields: Vec<(Atom, TypeExprId)>,
+    },
     Tuple {
         args: Vec<TypeExprId>,
     },
@@ -980,6 +984,7 @@ impl TypeExpr {
             TypeExpr::Union { .. } => "TypeExpr::Union",
             TypeExpr::Range { .. } => "TypeExpr::Range",
             TypeExpr::Record { .. } => "TypeExpr::Record",
+            TypeExpr::NativeRecord { .. } => "TypeExpr::NativeRecord",
             TypeExpr::Tuple { .. } => "TypeExpr::Tuple",
             TypeExpr::UnaryOp { .. } => "TypeExpr::UnaryOp",
             TypeExpr::Var(_) => "TypeExpr::Var",

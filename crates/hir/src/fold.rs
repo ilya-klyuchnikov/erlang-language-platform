@@ -1226,6 +1226,9 @@ impl<'a, T> FoldCtx<'a, T> {
             TypeExpr::Record { name: _, fields } => fields
                 .iter()
                 .fold(acc, |acc, (_, field)| self.do_fold_type_expr(*field, acc)),
+            TypeExpr::NativeRecord { name: _, fields } => fields
+                .iter()
+                .fold(acc, |acc, (_, field)| self.do_fold_type_expr(*field, acc)),
             TypeExpr::Tuple { args } => args
                 .iter()
                 .fold(acc, |acc, ty| self.do_fold_type_expr(*ty, acc)),

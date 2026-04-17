@@ -1322,6 +1322,20 @@ impl<'a> Printer<'a> {
                     });
                 });
             }
+            TypeExpr::NativeRecord { name, fields } => {
+                self.print_herald("TypeExpr::NativeRecord", &mut |this| {
+                    this.print_native_record_name(name);
+                    this.print_labelled("fields", false, &mut |this| {
+                        fields.iter().for_each(|(name, ty)| {
+                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            this.indent();
+                            this.print_type(ty);
+                            writeln!(this, ",").ok();
+                            this.dedent();
+                        });
+                    });
+                });
+            }
             TypeExpr::Tuple { args } => {
                 self.print_herald("TypeExpr::Tuple", &mut |this| {
                     args.iter().for_each(|ty| {
@@ -3994,6 +4008,66 @@ mod tests {
                     guards
                     exprs
                         Expr<2>:Expr::Var(A),
+                }.
+            "#]],
+        );
+    }
+
+    #[test]
+    fn type_native_record_qualified() {
+        check(
+            r#"
+            -type foo() :: #mod:name{a :: integer(), b :: atom()}.
+            "#,
+            expect![[r#"
+                -type foo() :: TypeExpr::NativeRecord {
+                    name: #mod:name
+                    fields
+                        Atom('a'):
+                            TypeExpr::Call {
+                                target
+                                    CallTarget::Remote {
+                                        Literal(Atom('erlang'))
+                                        Literal(Atom('integer'))
+                                    }
+                                args
+                                    ()
+                            },
+                        Atom('b'):
+                            TypeExpr::Call {
+                                target
+                                    CallTarget::Remote {
+                                        Literal(Atom('erlang'))
+                                        Literal(Atom('atom'))
+                                    }
+                                args
+                                    ()
+                            },
+                }.
+            "#]],
+        );
+    }
+
+    #[test]
+    fn type_native_record_anon() {
+        check(
+            r#"
+            -type foo() :: #_{a :: integer()}.
+            "#,
+            expect![[r#"
+                -type foo() :: TypeExpr::NativeRecord {
+                    name: #_
+                    fields
+                        Atom('a'):
+                            TypeExpr::Call {
+                                target
+                                    CallTarget::Remote {
+                                        Literal(Atom('erlang'))
+                                        Literal(Atom('integer'))
+                                    }
+                                args
+                                    ()
+                            },
                 }.
             "#]],
         );
