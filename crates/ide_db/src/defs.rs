@@ -127,6 +127,9 @@ impl SymbolClass {
                 ast::ImportAttribute(import) => {
                     reference_other(sema.to_def(token.with_value(&import)))
                 },
+                ast::ImportRecordAttribute(import) => {
+                    reference_other(sema.to_def(token.with_value(&import)))
+                },
                 ast::Fa(fa) => {
                     match sema.to_def(token.with_value(&fa)) {
                         Some(FaDef::FuzzyFunction(def)) => {

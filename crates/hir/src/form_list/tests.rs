@@ -343,6 +343,33 @@ fn import() {
 }
 
 #[test]
+fn import_record() {
+    check(
+        r#"
+//- expect_parse_errors
+-import_record(, []).
+-import_record(foo, []).
+-import_record(foo, [bar]).
+-import_record(foo, [bar, baz]).
+"#,
+        expect![[r#"
+            -import_record([missing name], []). %% cond: None
+
+            -import_record(foo, []). %% cond: None
+
+            -import_record(foo, [ %% cond: None
+                bar
+            ]).
+
+            -import_record(foo, [ %% cond: None
+                bar,
+                baz
+            ]).
+        "#]],
+    )
+}
+
+#[test]
 fn type_export() {
     check(
         r#"

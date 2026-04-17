@@ -33,8 +33,10 @@ use crate::FormIdx;
 use crate::FormList;
 use crate::FunctionClause;
 use crate::Import;
+use crate::ImportRecord;
 use crate::IncludeAttribute;
 use crate::ModuleAttribute;
+use crate::NameEntry;
 use crate::OptionalCallbacks;
 use crate::PPCondition;
 use crate::PPConditionId;
@@ -94,6 +96,7 @@ impl Printer<'_> {
                 self.print_doc_metadata_attribute(&self.forms[idx])?
             }
             FormIdx::FeatureAttribute(idx) => self.print_feature_attribute(&self.forms[idx])?,
+            FormIdx::ImportRecord(idx) => self.print_import_record(&self.forms[idx])?,
             FormIdx::DeprecatedAttribute(idx) => self.print_deprecated(&self.forms[idx])?,
             FormIdx::SsrDefinition(idx) => self.print_ssr(&self.forms[idx])?,
         }
@@ -420,6 +423,29 @@ impl Printer<'_> {
             "-feature(...). %% cond: {:?}",
             raw_cond(&attribute.pp_ctx)
         )
+    }
+
+    fn print_import_record(&mut self, import_record: &ImportRecord) -> fmt::Result {
+        write!(self, "-import_record({}, ", import_record.from)?;
+        self.print_name_entries(&import_record.entries, &import_record.pp_ctx)
+    }
+
+    fn print_name_entries(
+        &mut self,
+        entries: &IdxRange<NameEntry>,
+        pp_ctx: &FormPPContext,
+    ) -> fmt::Result {
+        if entries.is_empty() {
+            writeln!(self, "[]). %% cond: {:?}", raw_cond(pp_ctx))
+        } else {
+            writeln!(self, "[ %% cond: {:?}", raw_cond(pp_ctx))?;
+            let mut sep = "";
+            for entry_id in entries.clone() {
+                write!(self, "{}    {}", sep, self.forms[entry_id].name)?;
+                sep = ",\n";
+            }
+            writeln!(self, "\n]).")
+        }
     }
 
     fn print_deprecated(&mut self, attribute: &DeprecatedAttribute) -> fmt::Result {

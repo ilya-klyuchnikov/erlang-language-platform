@@ -59,6 +59,7 @@ fn try_extend_selection(root: &SyntaxNode, frange: FileRange) -> Option<TextRang
         GUARD,
         IF_EXPR,
         IMPORT_ATTRIBUTE,
+        IMPORT_RECORD_ATTRIBUTE,
         LC_EXPRS,
         LIST,
         MACRO_CALL_ARGS,

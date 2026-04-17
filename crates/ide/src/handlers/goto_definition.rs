@@ -1119,6 +1119,22 @@ bar() -> ok.
     }
 
     #[test]
+    fn import_record_attribute() {
+        check(
+            r#"
+//- /src/main.erl
+-module(main).
+
+-import_record(a~nother, [my_rec]).
+
+//- /src/another.erl
+  -module(another).
+%%^^^^^^^^^^^^^^^^^
+"#,
+        )
+    }
+
+    #[test]
     fn import_attribute() {
         check(
             r#"

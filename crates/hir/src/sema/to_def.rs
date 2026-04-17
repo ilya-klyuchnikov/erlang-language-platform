@@ -124,6 +124,16 @@ impl ToDef for ast::ImportAttribute {
     }
 }
 
+impl ToDef for ast::ImportRecordAttribute {
+    type Def = Module;
+
+    fn to_def(sema: &Semantic<'_>, ast: InFile<&Self>) -> Option<Self::Def> {
+        let attr = sema.find_form(ast)?;
+        let def = resolve_module_name(sema, ast.file_id, &attr.from)?;
+        Some(def)
+    }
+}
+
 // ---------------------------------------------------------------------
 
 #[derive(Debug)]

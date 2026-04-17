@@ -50,11 +50,13 @@ use crate::FaEntryId;
 use crate::FormList;
 use crate::FunctionClause;
 use crate::Import;
+use crate::ImportRecord;
 use crate::IncludeAttribute;
 use crate::MacroName;
 use crate::ModuleAttribute;
 use crate::Name;
 use crate::NameArity;
+use crate::NameEntry;
 use crate::OptionalCallbacks;
 use crate::PPCondition;
 use crate::PPConditionId;
@@ -137,8 +139,9 @@ impl<'a> Ctx<'a> {
                     }
                     ast::Form::FileAttribute(_) => None,
                     ast::Form::ImportAttribute(import) => self.lower_import(import),
-                    // TODO: (T262108365) fully implemented in the next commit
-                    ast::Form::ImportRecordAttribute(_) => None,
+                    ast::Form::ImportRecordAttribute(import_record) => {
+                        self.lower_import_record(import_record)
+                    }
                     ast::Form::Opaque(opaque) => self.lower_opaque(opaque),
                     ast::Form::OptionalCallbacksAttribute(cbs) => {
                         self.lower_optional_callbacks(cbs)
@@ -568,6 +571,56 @@ impl<'a> Ctx<'a> {
             form_id,
         };
         Some(FormIdx::Import(self.data.imports.alloc(res)))
+    }
+
+    fn lower_import_record(
+        &mut self,
+        import_record: &ast::ImportRecordAttribute,
+    ) -> Option<FormIdx> {
+        let from = import_record
+            .module()
+            .map(|name| self.resolve_name(&name))
+            .unwrap_or(Name::MISSING);
+        let record_names = import_record
+            .records()
+            .into_iter()
+            .flat_map(|r| r.names())
+            .filter_map(|name| match name {
+                ast::Name::Atom(atom) => Some(atom),
+                _ => None,
+            });
+        let entries = self.lower_name_entries(record_names);
+        let pp_ctx = self.current_pp_ctx();
+        let form_id = self.id_map.get_id(import_record);
+        let res = ImportRecord {
+            from,
+            entries,
+            pp_ctx,
+            form_id,
+        };
+        Some(FormIdx::ImportRecord(self.data.record_imports.alloc(res)))
+    }
+
+    fn lower_name_entries(
+        &mut self,
+        entries: impl Iterator<Item = ast::Atom>,
+    ) -> IdxRange<NameEntry> {
+        let mut entries = entries.enumerate().map(|(idx, atom)| {
+            let name = atom.as_name();
+            let res = NameEntry {
+                name,
+                idx: idx as u32,
+            };
+            self.data.name_entries.alloc(res)
+        });
+
+        if let Some(first) = entries.next() {
+            let last = entries.last().unwrap_or(first);
+            IdxRange::new_inclusive(first..=last)
+        } else {
+            let zero = Idx::from_raw(RawIdx::from(0));
+            IdxRange::new(zero..zero)
+        }
     }
 
     fn lower_type_export(&mut self, export: &ast::ExportTypeAttribute) -> Option<FormIdx> {

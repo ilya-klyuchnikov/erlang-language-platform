@@ -2219,6 +2219,7 @@ bar() ->
                         Form::CompileOption(_) => acc,
                         Form::DeprecatedAttribute(_) => acc,
                         Form::FeatureAttribute(_) => acc,
+                        Form::ImportRecord(_) => acc,
                         Form::SsrDefinition(_) => acc,
                     }
                 } else {

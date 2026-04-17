@@ -151,6 +151,10 @@ impl FormList {
         self.data.doc_metadata_attributes.iter()
     }
 
+    pub fn record_imports(&self) -> impl Iterator<Item = (ImportRecordId, &ImportRecord)> {
+        self.data.record_imports.iter()
+    }
+
     pub fn pp_stack(&self) -> &Arena<PPDirective> {
         &self.data.pp_directives
     }
@@ -232,6 +236,7 @@ impl FormList {
             FormIdx::CompileOption(idx) => Form::CompileOption(&self[idx]),
             FormIdx::DeprecatedAttribute(idx) => Form::DeprecatedAttribute(&self[idx]),
             FormIdx::FeatureAttribute(idx) => Form::FeatureAttribute(&self[idx]),
+            FormIdx::ImportRecord(idx) => Form::ImportRecord(&self[idx]),
             FormIdx::SsrDefinition(idx) => Form::SsrDefinition(&self[idx]),
         }
     }
@@ -331,7 +336,9 @@ pub(crate) struct FormListData {
     compile_options: Arena<CompileOption>,
     record_fields: Arena<RecordField>,
     fa_entries: Arena<FaEntry>,
+    name_entries: Arena<NameEntry>,
     deprecates: Arena<DeprecatedAttribute>,
+    record_imports: Arena<ImportRecord>,
     ssr_definitions: Arena<SsrDefinition>,
     pub condition_envs: Arena<ConditionEnv>,
 }
@@ -364,7 +371,9 @@ impl FormListData {
             compile_options,
             record_fields,
             fa_entries,
+            name_entries,
             deprecates,
+            record_imports,
             ssr_definitions,
             condition_envs,
         } = self;
@@ -392,7 +401,9 @@ impl FormListData {
         feature_attributes.shrink_to_fit();
         record_fields.shrink_to_fit();
         fa_entries.shrink_to_fit();
+        name_entries.shrink_to_fit();
         deprecates.shrink_to_fit();
+        record_imports.shrink_to_fit();
         ssr_definitions.shrink_to_fit();
         condition_envs.shrink_to_fit();
     }
@@ -421,6 +432,7 @@ pub enum FormIdx {
     CompileOption(CompileOptionId),
     DeprecatedAttribute(DeprecatedAttributeId),
     FeatureAttribute(FeatureAttributeId),
+    ImportRecord(ImportRecordId),
     SsrDefinition(SsrDefinitionId),
 }
 
@@ -447,6 +459,7 @@ pub enum Form<'a> {
     CompileOption(&'a CompileOption),
     DeprecatedAttribute(&'a DeprecatedAttribute),
     FeatureAttribute(&'a FeatureAttribute),
+    ImportRecord(&'a ImportRecord),
     SsrDefinition(&'a SsrDefinition),
 }
 
@@ -475,6 +488,7 @@ impl<'a> Form<'a> {
             Form::CompileOption(f) => f.form_id.upcast(),
             Form::DeprecatedAttribute(f) => f.form_id().upcast(),
             Form::FeatureAttribute(f) => f.form_id.upcast(),
+            Form::ImportRecord(f) => f.form_id.upcast(),
             Form::SsrDefinition(f) => f.form_id.upcast(),
         }
     }
@@ -521,6 +535,7 @@ impl<'a> Form<'a> {
                 DeprecatedAttribute::Fas { pp_ctx, .. } => Some(pp_ctx),
             },
             Form::FeatureAttribute(f) => Some(&f.pp_ctx),
+            Form::ImportRecord(f) => Some(&f.pp_ctx),
             Form::SsrDefinition(f) => Some(&f.pp_ctx),
         }
     }
@@ -549,7 +564,9 @@ pub type DocMetadataAttributeId = Idx<DocMetadataAttribute>;
 pub type CompileOptionId = Idx<CompileOption>;
 pub type RecordFieldId = Idx<RecordField>;
 pub type FaEntryId = Idx<FaEntry>;
+pub type NameEntryId = Idx<NameEntry>;
 pub type DeprecatedAttributeId = Idx<DeprecatedAttribute>;
+pub type ImportRecordId = Idx<ImportRecord>;
 pub type FeatureAttributeId = Idx<FeatureAttribute>;
 pub type SsrDefinitionId = Idx<SsrDefinition>;
 pub type ConditionEnvId = Idx<ConditionEnv>;
@@ -796,6 +813,22 @@ impl Index<SsrDefinitionId> for FormList {
 
     fn index(&self, index: SsrDefinitionId) -> &Self::Output {
         &self.data.ssr_definitions[index]
+    }
+}
+
+impl Index<NameEntryId> for FormList {
+    type Output = NameEntry;
+
+    fn index(&self, index: NameEntryId) -> &Self::Output {
+        &self.data.name_entries[index]
+    }
+}
+
+impl Index<ImportRecordId> for FormList {
+    type Output = ImportRecord;
+
+    fn index(&self, index: ImportRecordId) -> &Self::Output {
+        &self.data.record_imports[index]
     }
 }
 
@@ -1213,4 +1246,20 @@ pub struct RecordField {
 pub struct FaEntry {
     pub name: NameArity,
     pub idx: u32,
+}
+
+/// Entry in an import_record/export_record list (plain name, no arity)
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct NameEntry {
+    pub name: Name,
+    pub idx: u32,
+}
+
+/// -import_record(Module, [Name1, Name2]).
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ImportRecord {
+    pub from: Name,
+    pub entries: IdxRange<NameEntry>,
+    pub pp_ctx: FormPPContext,
+    pub form_id: FormId<ast::ImportRecordAttribute>,
 }

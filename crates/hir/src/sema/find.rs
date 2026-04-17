@@ -18,6 +18,7 @@ use crate::Define;
 use crate::Export;
 use crate::FormIdx;
 use crate::Import;
+use crate::ImportRecord;
 use crate::InFile;
 use crate::IncludeAttributeId;
 use crate::ModuleAttribute;
@@ -171,6 +172,27 @@ impl FindForm for ast::ImportAttribute {
         let form_idx = form_list.find_form(&ast::Form::ImportAttribute(ast.value.clone()))?;
         let form = match form_idx {
             FormIdx::Import(idx) => {
+                if &form_list[idx].form_id.get(&source_file) == ast.value {
+                    Some(idx)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }?;
+        Some(form_list[form].clone())
+    }
+}
+
+impl FindForm for ast::ImportRecordAttribute {
+    type Form = ImportRecord;
+
+    fn find(sema: &Semantic<'_>, ast: InFile<&Self>) -> Option<Self::Form> {
+        let source_file = sema.parse(ast.file_id).value;
+        let form_list = sema.form_list(ast.file_id);
+        let form_idx = form_list.find_form(&ast::Form::ImportRecordAttribute(ast.value.clone()))?;
+        let form = match form_idx {
+            FormIdx::ImportRecord(idx) => {
                 if &form_list[idx].form_id.get(&source_file) == ast.value {
                     Some(idx)
                 } else {
