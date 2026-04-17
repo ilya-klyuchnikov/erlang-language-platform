@@ -1883,6 +1883,39 @@ impl std::fmt::Display for ExportAttribute {
 }
 #[doc = r" Via NodeType::Node 2 struct inner"]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ExportRecordAttribute {
+    pub(crate) syntax: SyntaxNode,
+}
+impl ExportRecordAttribute {
+    pub fn records(&self) -> AstChildren<Atom> {
+        support::children(&self.syntax)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct"]
+impl AstNode for ExportRecordAttribute {
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == EXPORT_RECORD_ATTRIBUTE
+    }
+    #[doc = r" Via field_casts"]
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+    fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+}
+#[doc = r" Via NodeType::Node 2 display"]
+impl std::fmt::Display for ExportRecordAttribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.syntax(), f)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct inner"]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ExportTypeAttribute {
     pub(crate) syntax: SyntaxNode,
 }
@@ -2728,6 +2761,7 @@ pub enum Form {
     CompileOptionsAttribute(CompileOptionsAttribute),
     DeprecatedAttribute(DeprecatedAttribute),
     ExportAttribute(ExportAttribute),
+    ExportRecordAttribute(ExportRecordAttribute),
     ExportTypeAttribute(ExportTypeAttribute),
     FeatureAttribute(FeatureAttribute),
     FileAttribute(FileAttribute),
@@ -2764,6 +2798,7 @@ impl AstNode for Form {
             | COMPILE_OPTIONS_ATTRIBUTE
             | DEPRECATED_ATTRIBUTE
             | EXPORT_ATTRIBUTE
+            | EXPORT_RECORD_ATTRIBUTE
             | EXPORT_TYPE_ATTRIBUTE
             | FEATURE_ATTRIBUTE
             | FILE_ATTRIBUTE
@@ -2799,6 +2834,9 @@ impl AstNode for Form {
             }
             DEPRECATED_ATTRIBUTE => Some(Form::DeprecatedAttribute(DeprecatedAttribute { syntax })),
             EXPORT_ATTRIBUTE => Some(Form::ExportAttribute(ExportAttribute { syntax })),
+            EXPORT_RECORD_ATTRIBUTE => Some(Form::ExportRecordAttribute(ExportRecordAttribute {
+                syntax,
+            })),
             EXPORT_TYPE_ATTRIBUTE => {
                 Some(Form::ExportTypeAttribute(ExportTypeAttribute { syntax }))
             }
@@ -2832,6 +2870,7 @@ impl AstNode for Form {
             Form::CompileOptionsAttribute(it) => it.syntax(),
             Form::DeprecatedAttribute(it) => it.syntax(),
             Form::ExportAttribute(it) => it.syntax(),
+            Form::ExportRecordAttribute(it) => it.syntax(),
             Form::ExportTypeAttribute(it) => it.syntax(),
             Form::FeatureAttribute(it) => it.syntax(),
             Form::FileAttribute(it) => it.syntax(),
@@ -2880,6 +2919,11 @@ impl From<DeprecatedAttribute> for Form {
 impl From<ExportAttribute> for Form {
     fn from(node: ExportAttribute) -> Form {
         Form::ExportAttribute(node)
+    }
+}
+impl From<ExportRecordAttribute> for Form {
+    fn from(node: ExportRecordAttribute) -> Form {
+        Form::ExportRecordAttribute(node)
     }
 }
 impl From<ExportTypeAttribute> for Form {

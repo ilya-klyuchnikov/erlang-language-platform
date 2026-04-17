@@ -142,6 +142,8 @@ impl<'a> Ctx<'a> {
                     ast::Form::ImportRecordAttribute(import_record) => {
                         self.lower_import_record(import_record)
                     }
+                    // TODO: (T262108365) minimal for now, implemented in next commit
+                    ast::Form::ExportRecordAttribute(_) => None,
                     ast::Form::Opaque(opaque) => self.lower_opaque(opaque),
                     ast::Form::OptionalCallbacksAttribute(cbs) => {
                         self.lower_optional_callbacks(cbs)
