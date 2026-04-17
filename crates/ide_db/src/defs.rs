@@ -152,6 +152,19 @@ impl SymbolClass {
                         .cloned()?;
                     reference_direct(Some(record_def))
                 },
+                ast::ExportRecordAttribute(_export_record) => {
+                    if let Some(atom) = ast::Atom::cast(wrapper.clone()) {
+                        let record_name = atom.as_name();
+                        let record_def = sema.db
+                            .def_map(token.file_id)
+                            .get_records()
+                            .get(&record_name)
+                            .cloned()?;
+                        reference_direct(Some(record_def))
+                    } else {
+                        None
+                    }
+                },
                 ast::Fa(fa) => {
                     match sema.to_def(token.with_value(&fa)) {
                         Some(FaDef::FuzzyFunction(def)) => {

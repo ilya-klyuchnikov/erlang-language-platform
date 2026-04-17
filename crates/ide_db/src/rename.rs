@@ -97,6 +97,27 @@ pub fn is_valid_macro_name(new_name: &String) -> bool {
     )
 }
 
+// Delegate checking record name validity to the parser.
+// Record names are atoms.
+pub fn is_valid_record_name(new_name: &String) -> bool {
+    let parse = ast::SourceFile::parse_text(format!("-record({new_name}, {{}}).").as_str());
+    match parse.tree().forms().next() {
+        Some(ast::Form::RecordDecl(decl)) => decl
+            .name()
+            .is_some_and(|name| name.syntax().text().to_string() == *new_name),
+        _ => false,
+    }
+}
+
+/// Check that the new record name doesn't already exist in scope.
+pub fn is_safe_record(sema: &Semantic, file_id: FileId, new_name: &str) -> bool {
+    sema.db
+        .def_map(file_id)
+        .get_records()
+        .keys()
+        .all(|name| *name.to_string() != *new_name)
+}
+
 // Delegate checking record field name validity to the parser.
 // Record field names are atoms, so we reuse the function name check.
 pub fn is_valid_record_field_name(new_name: &String) -> bool {
@@ -173,8 +194,18 @@ impl SymbolDefinition {
                     self.rename_reference(sema, new_name, parens_needed_in_context, safety_check)
                 }
             }
-            SymbolDefinition::Record(_) => {
-                rename_error!("Cannot rename record")
+            SymbolDefinition::Record(ref record_def) => {
+                if safety_check == SafetyChecks::Yes && !is_valid_record_name(new_name) {
+                    rename_error!("Invalid new record name: '{}'", new_name);
+                }
+
+                if safety_check == SafetyChecks::Yes
+                    && !is_safe_record(sema, record_def.file.file_id, new_name)
+                {
+                    rename_error!("Record '{}' already in scope", new_name);
+                }
+
+                self.rename_reference(sema, new_name, parens_needed_in_context, safety_check)
             }
             SymbolDefinition::RecordField(ref field_def) => {
                 if safety_check == SafetyChecks::Yes && !is_valid_record_field_name(new_name) {
@@ -292,6 +323,13 @@ impl SymbolDefinition {
                     range,
                 })
             }
+            SymbolDefinition::Record(record_def) => {
+                let range = record_def.name_range(sema.db.upcast())?;
+                Some(FileRange {
+                    file_id: record_def.file.file_id,
+                    range,
+                })
+            }
             SymbolDefinition::RecordField(field_def) => {
                 let source = field_def.source(sema.db.upcast());
                 let name = source.name()?;
@@ -388,6 +426,22 @@ impl SymbolDefinition {
 
                 // Also need to rename the definition itself
                 // Get the type definition location
+                let (file_id, def_edit) = source_edit_from_def(sema, self.clone(), new_name)?;
+                source_change.insert_source_edit(file_id, def_edit);
+
+                source_edit_from_usages(
+                    &mut source_change,
+                    usages.iter().collect(),
+                    new_name,
+                    parens_needed_in_context,
+                );
+                Ok(source_change)
+            }
+            SymbolDefinition::Record(_record_def) => {
+                // Find all usages of the record
+                let usages = self.clone().usages(sema).all();
+
+                // Also need to rename the definition itself
                 let (file_id, def_edit) = source_edit_from_def(sema, self.clone(), new_name)?;
                 source_change.insert_source_edit(file_id, def_edit);
 

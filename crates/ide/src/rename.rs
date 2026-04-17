@@ -3140,4 +3140,33 @@ pub(crate) mod tests {
             "#,
         );
     }
+
+    // ---------------------------------
+    // Native record renaming (EEP 79 / OTP 29)
+    // ---------------------------------
+
+    #[test]
+    fn test_rename_native_record_local_usage() {
+        // Rename a native record (EEP 79) that is used locally
+        // and also exported via export_record
+        check_rename(
+            "new_rec",
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -export_record([my_rec]).
+            -record #my_~rec{a, b}.
+            foo() -> #my_rec{a = 1, b = 2}.
+            bar(#my_rec{a = A}) -> A.
+            "#,
+            r#"
+            //- /src/definer.erl
+            -module(definer).
+            -export_record([new_rec]).
+            -record #new_rec{a, b}.
+            foo() -> #new_rec{a = 1, b = 2}.
+            bar(#new_rec{a = A}) -> A.
+            "#,
+        );
+    }
 }
