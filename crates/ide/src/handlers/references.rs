@@ -678,6 +678,41 @@ foo() -> another:imp~orted().
     }
 
     #[test]
+    fn test_import_record_module() {
+        // Cursor on the module name in import_record
+        check(
+            r#"
+//- /foo/src/main.erl app:foo
+-module(main).
+-import_record(anot~her, [my_rec]).
+%%             ^^^^^^^
+
+//- /foo/src/another.erl app:foo
+   -module(another).
+%% ^^^^^^^^^^^^^^^^^def
+-record(my_rec, {field}).
+"#,
+        );
+    }
+
+    #[test]
+    fn test_import_record_record_name() {
+        // Cursor on a record name in import_record, finds the definition
+        check(
+            r#"
+//- /foo/src/main.erl app:foo
+-module(main).
+-import_record(another, [my_r~ec]).
+
+//- /foo/src/another.erl app:foo
+-module(another).
+-record(my_rec, {field}).
+%%      ^^^^^^def
+"#,
+        );
+    }
+
+    #[test]
     fn test_macro() {
         check(
             r#"

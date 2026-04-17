@@ -127,8 +127,30 @@ impl SymbolClass {
                 ast::ImportAttribute(import) => {
                     reference_other(sema.to_def(token.with_value(&import)))
                 },
-                ast::ImportRecordAttribute(import) => {
-                    reference_other(sema.to_def(token.with_value(&import)))
+                ast::ImportRecordAttribute(import_record) => {
+                    reference_direct(sema.to_def(token.with_value(&import_record)))
+                },
+                ast::ImportRecordNames(names) => {
+                    let atom = ast::Atom::cast(wrapper.clone())?;
+                    let import_record = ast::ImportRecordAttribute::cast(
+                        names.syntax().parent()?
+                    )?;
+                    let module_name = import_record.module()?;
+                    let ast::Name::Atom(a) = module_name else {
+                        return None;
+                    };
+                    let module_name = a.as_name();
+                    let module = sema.resolve_module_name(
+                        token.file_id,
+                        module_name.as_str(),
+                    )?;
+                    let record_name = atom.as_name();
+                    let record_def = sema.db
+                        .def_map(module.file.file_id)
+                        .get_records()
+                        .get(&record_name)
+                        .cloned()?;
+                    reference_direct(Some(record_def))
                 },
                 ast::Fa(fa) => {
                     match sema.to_def(token.with_value(&fa)) {

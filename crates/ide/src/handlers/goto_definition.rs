@@ -1571,6 +1571,42 @@ foo() -> #rec{field1 = 1, f~ield3 = ok, field2 = ""}.
     }
 
     #[test]
+    fn import_record_attribute_module() {
+        check(
+            r#"
+//- /src/main.erl
+-module(main).
+
+-import_record(a~nother, [my_rec]).
+
+//- /src/another.erl
+  -module(another).
+%%^^^^^^^^^^^^^^^^^
+
+-record(my_rec, {field}).
+"#,
+        )
+    }
+
+    #[test]
+    fn import_record_attribute_record() {
+        check(
+            r#"
+//- /src/main.erl
+-module(main).
+
+-import_record(another, [my_~rec]).
+
+//- /src/another.erl
+-module(another).
+
+-record(my_rec, {field}).
+      %%^^^^^^
+"#,
+        )
+    }
+
+    #[test]
     fn export_type_entry() {
         check(
             r#"
