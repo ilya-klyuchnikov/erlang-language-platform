@@ -2125,3 +2125,138 @@ fn ssr_predicates_on_match_expr_pat() {
     "#]]
     .assert_debug_eq(&match_expr.placeholder_is_atom(&sema, "_@A"));
 }
+
+// ---------------------------------------------------------------------
+// Native records (EEP 79)
+
+#[test]
+fn ssr_native_record_qualified_create() {
+    assert_matches(
+        "ssr: #mod:name{k1 = _@A, k2 = _@B}.",
+        "fn() -> X = #mod:name{k1 = a, k2 = <<\"blah\">>}, X.",
+        &[(
+            "#mod:name{k1 = a, k2 = <<\"blah\">>}",
+            &[("_@A", &["a"]), ("_@B", &["<<\"blah\">>"])],
+        )],
+    );
+}
+
+#[test]
+fn ssr_native_record_qualified_create_wrong_name() {
+    assert_matches(
+        "ssr: #mod:name{k1 = _@A}.",
+        "fn() -> X = #mod:other{k1 = a}, X.",
+        &[],
+    );
+    assert_matches(
+        "ssr: #mod:name{k1 = _@A}.",
+        "fn() -> X = #other:name{k1 = a}, X.",
+        &[],
+    );
+}
+
+#[test]
+fn ssr_native_record_qualified_create_unordered() {
+    assert_matches(
+        "ssr: #mod:name{k1 = _@A, k2 = _@B, k3 = _@C}.",
+        "fn() -> X = #mod:name{k2 = a, k3 = <<\"blah\">>, k1 = {c, d}}, X.",
+        &[(
+            "#mod:name{k2 = a, k3 = <<\"blah\">>, k1 = {c, d}}",
+            &[
+                ("_@A", &["{c, d}"]),
+                ("_@B", &["a"]),
+                ("_@C", &["<<\"blah\">>"]),
+            ],
+        )],
+    );
+}
+
+#[test]
+fn ssr_native_record_anon_create() {
+    assert_matches(
+        "ssr: #_{k1 = _@A, k2 = _@B}.",
+        "fn() -> X = #_{k1 = a, k2 = <<\"blah\">>}, X.",
+        &[(
+            "#_{k1 = a, k2 = <<\"blah\">>}",
+            &[("_@A", &["a"]), ("_@B", &["<<\"blah\">>"])],
+        )],
+    );
+}
+
+#[test]
+fn ssr_native_record_anon_does_not_match_qualified() {
+    assert_matches(
+        "ssr: #_{k1 = _@A}.",
+        "fn() -> X = #mod:name{k1 = a}, X.",
+        &[],
+    );
+}
+
+#[test]
+fn ssr_native_record_qualified_update() {
+    assert_matches(
+        "ssr: _@A#mod:name{field = _@B}.",
+        "bar(List) -> XX = 1, List#mod:name{field = XX}.",
+        &[(
+            "List#mod:name{field = XX}",
+            &[("_@A", &["List"]), ("_@B", &["XX"])],
+        )],
+    );
+}
+
+#[test]
+fn ssr_native_record_qualified_update_wrong_name() {
+    assert_matches(
+        "ssr: _@A#mod:name{field = _@B}.",
+        "bar(List) -> XX = 1, List#mod:other{field = XX}.",
+        &[],
+    );
+}
+
+#[test]
+fn ssr_native_record_anon_update() {
+    assert_matches(
+        "ssr: _@A#_{field = _@B}.",
+        "bar(List) -> XX = 1, List#_{field = XX}.",
+        &[(
+            "List#_{field = XX}",
+            &[("_@A", &["List"]), ("_@B", &["XX"])],
+        )],
+    );
+}
+
+#[test]
+fn ssr_native_record_qualified_field_access() {
+    assert_matches(
+        "ssr: _@A#mod:name.field.",
+        "bar(List) -> XX = List#mod:name.field, XX.",
+        &[("List#mod:name.field", &[("_@A", &["List"])])],
+    );
+}
+
+#[test]
+fn ssr_native_record_qualified_field_access_wrong_name() {
+    assert_matches(
+        "ssr: _@A#mod:name.field.",
+        "bar(List) -> XX = List#mod:other.field, XX.",
+        &[],
+    );
+}
+
+#[test]
+fn ssr_native_record_qualified_field_access_wrong_field() {
+    assert_matches(
+        "ssr: _@A#mod:name.field.",
+        "bar(List) -> XX = List#mod:name.other, XX.",
+        &[],
+    );
+}
+
+#[test]
+fn ssr_native_record_anon_field_access() {
+    assert_matches(
+        "ssr: _@A#_.field.",
+        "bar(List) -> XX = List#_.field, XX.",
+        &[("List#_.field", &[("_@A", &["List"])])],
+    );
+}
