@@ -184,7 +184,7 @@ impl Anchor {
 
                 // Check if we're inside a comprehension's expression
                 if let Some(lc) = ast::ListComprehension::cast(parent.clone())
-                    && lc.expr().map(|e| *e.syntax() == node).unwrap_or(false)
+                    && lc.exprs().any(|e| *e.syntax() == node)
                 {
                     return Some(Anchor::Comprehension(node));
                 }
@@ -194,7 +194,7 @@ impl Anchor {
                     return Some(Anchor::Comprehension(node));
                 }
                 if let Some(mc) = ast::MapComprehension::cast(parent.clone())
-                    && mc.expr().map(|e| *e.syntax() == node).unwrap_or(false)
+                    && mc.exprs().any(|e| *e.syntax() == node)
                 {
                     return Some(Anchor::Comprehension(node));
                 }

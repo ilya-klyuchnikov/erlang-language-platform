@@ -682,11 +682,11 @@ impl CallTarget<ExprId> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ComprehensionBuilder {
-    List(ExprId),
+    List(Vec<ExprId>),
     Binary(ExprId),
-    Map(ExprId, ExprId),
+    Map(Vec<(ExprId, ExprId)>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

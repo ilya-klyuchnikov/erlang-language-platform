@@ -826,7 +826,9 @@ impl<'a> Ctx<'a> {
                 self.alloc_pat(Pat::List { pats, tail }, Some(expr))
             }
             ast::ExprMax::ListComprehension(lc) => {
-                let _ = self.lower_optional_pat(lc.expr());
+                lc.exprs().for_each(|e| {
+                    let _ = self.lower_pat(&e);
+                });
                 let _ = self.lower_lc_exprs(lc.lc_exprs());
                 self.alloc_pat(Pat::Missing, Some(expr))
             }
@@ -890,8 +892,10 @@ impl<'a> Ctx<'a> {
                 }),
             ast::ExprMax::MacroString(_) => self.alloc_pat(Pat::Missing, Some(expr)),
             ExprMax::MapComprehension(map_comp) => {
-                self.lower_optional_pat(map_comp.expr().and_then(|mf| mf.key()));
-                self.lower_optional_pat(map_comp.expr().and_then(|mf| mf.value()));
+                map_comp.exprs().for_each(|mf| {
+                    let _ = self.lower_optional_pat(mf.key());
+                    let _ = self.lower_optional_pat(mf.value());
+                });
                 let _ = self.lower_lc_exprs(map_comp.lc_exprs());
                 self.alloc_pat(Pat::Missing, Some(expr))
             }
@@ -1483,8 +1487,8 @@ impl<'a> Ctx<'a> {
                 self.alloc_expr(Expr::List { exprs, tail }, Some(expr))
             }
             ast::ExprMax::ListComprehension(lc) => {
-                let value = self.lower_optional_expr(lc.expr());
-                let builder = ComprehensionBuilder::List(value);
+                let values: Vec<ExprId> = lc.exprs().map(|e| self.lower_expr(&e)).collect();
+                let builder = ComprehensionBuilder::List(values);
                 let exprs = self.lower_lc_exprs(lc.lc_exprs());
                 self.alloc_expr(Expr::Comprehension { builder, exprs }, Some(expr))
             }
@@ -1679,18 +1683,32 @@ impl<'a> Ctx<'a> {
                 )
             }
             ast::ExprMax::MapComprehension(map_comp) => {
-                let key = self.lower_optional_expr(map_comp.expr().and_then(|mf| mf.key()));
-                let value = self.lower_optional_expr(map_comp.expr().and_then(|mf| mf.value()));
-                let exprs = self.lower_lc_exprs(map_comp.lc_exprs());
-                let comp_expr = match map_comp.expr().and_then(|mf| mf.op()) {
-                    Some((MapOp::Assoc, _)) => Expr::Comprehension {
-                        builder: ComprehensionBuilder::Map(key, value),
-                        exprs,
-                    },
-                    _ => Expr::Missing,
-                };
-
-                self.alloc_expr(comp_expr, Some(expr))
+                let map_fields: Vec<_> = map_comp.exprs().collect();
+                let all_assoc = map_fields
+                    .iter()
+                    .all(|mf| matches!(mf.op(), Some((MapOp::Assoc, _))));
+                if all_assoc {
+                    let fields: Vec<(ExprId, ExprId)> = map_fields
+                        .iter()
+                        .map(|mf| {
+                            let key = self.lower_optional_expr(mf.key());
+                            let value = self.lower_optional_expr(mf.value());
+                            (key, value)
+                        })
+                        .collect();
+                    let exprs = self.lower_lc_exprs(map_comp.lc_exprs());
+                    self.alloc_expr(
+                        Expr::Comprehension {
+                            builder: ComprehensionBuilder::Map(fields),
+                            exprs,
+                        },
+                        Some(expr),
+                    )
+                } else {
+                    // `:=` in map comprehension template is invalid;
+                    // the erlang_service will report the error.
+                    self.alloc_expr(Expr::Missing, Some(expr))
+                }
             }
         }
     }

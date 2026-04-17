@@ -594,24 +594,30 @@ impl<'a> Printer<'a> {
                 write!(self, "end")
             }
             Expr::Comprehension { builder, exprs } => {
-                let (start, end) = match builder {
-                    ComprehensionBuilder::List(_) => ("[", "]"),
-                    ComprehensionBuilder::Binary(_) => ("<<", ">>"),
-                    ComprehensionBuilder::Map(_, _) => ("#{", "}"),
-                };
-                writeln!(self, "{start}")?;
-                self.indent_level += 1;
                 match builder {
-                    ComprehensionBuilder::List(expr) => self.print_expr(&self.body[*expr])?,
-                    ComprehensionBuilder::Binary(expr) => self.print_expr(&self.body[*expr])?,
-                    ComprehensionBuilder::Map(expr1, expr2) => {
-                        self.print_expr(&self.body[*expr1])?;
-                        write!(self, " => ")?;
-                        self.print_expr(&self.body[*expr2])?
+                    ComprehensionBuilder::List(template_exprs) => {
+                        self.print_seq(template_exprs, None, "[", "", ",", |this, expr| {
+                            this.print_expr(&this.body[*expr])
+                        })?;
+                    }
+                    ComprehensionBuilder::Binary(expr) => {
+                        self.print_seq(&[*expr], None, "<<", "", ",", |this, expr| {
+                            this.print_expr(&this.body[*expr])
+                        })?;
+                    }
+                    ComprehensionBuilder::Map(fields) => {
+                        self.print_seq(fields, None, "#{", "", ",", |this, (key, value)| {
+                            this.print_expr(&this.body[*key])?;
+                            write!(this, " => ")?;
+                            this.print_expr(&this.body[*value])
+                        })?;
                     }
                 }
-                self.indent_level -= 1;
-                writeln!(self)?;
+                let end = match builder {
+                    ComprehensionBuilder::List(_) => "]",
+                    ComprehensionBuilder::Binary(_) => ">>",
+                    ComprehensionBuilder::Map(_) => "}",
+                };
                 self.print_seq(exprs, None, "||", end, ",", |this, expr| {
                     this.print_comprehension_expr(expr)
                 })

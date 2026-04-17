@@ -3437,8 +3437,8 @@ pub struct ListComprehension {
     pub(crate) syntax: SyntaxNode,
 }
 impl ListComprehension {
-    pub fn expr(&self) -> Option<Expr> {
-        support::child(&self.syntax, 0usize)
+    pub fn exprs(&self) -> AstChildren<Expr> {
+        support::children(&self.syntax)
     }
     pub fn lc_exprs(&self) -> Option<LcExprs> {
         support::child(&self.syntax, 0usize)
@@ -3849,8 +3849,8 @@ impl MapComprehension {
     pub fn lc_exprs(&self) -> Option<LcExprs> {
         support::child(&self.syntax, 0usize)
     }
-    pub fn expr(&self) -> Option<MapField> {
-        support::child(&self.syntax, 0usize)
+    pub fn exprs(&self) -> AstChildren<MapField> {
+        support::children(&self.syntax)
     }
 }
 #[doc = r" Via NodeType::Node 2 struct"]

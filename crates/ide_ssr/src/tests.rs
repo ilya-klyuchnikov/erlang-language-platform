@@ -953,6 +953,48 @@ fn ssr_expr_map_comprehension() {
 }
 
 #[test]
+fn ssr_expr_multi_template_list_comprehension() {
+    // Multi-template: [X, Y || X <- Xs]
+    assert_matches(
+        "ssr: [_@A, _@B || X <- _@List].",
+        "bar(Xs) -> [X + 1, X + 2 || X <- Xs].",
+        &[(
+            "[X + 1, X + 2 || X <- Xs]",
+            &[
+                ("_@A", &["X + 1"]),
+                ("_@B", &["X + 2"]),
+                ("_@List", &["Xs"]),
+            ],
+        )],
+    );
+    // Single-template pattern should NOT match multi-template code
+    assert_matches(
+        "ssr: [_@A || X <- _@List].",
+        "bar(Xs) -> [X + 1, X + 2 || X <- Xs].",
+        &[],
+    );
+}
+
+#[test]
+fn ssr_expr_multi_template_map_comprehension() {
+    // Multi-template: #{K1 => V1, K2 => V2 || ...}
+    assert_matches(
+        "ssr: #{_@K1 => _@V1, _@K2 => _@V2 || K := V <- _@Map}.",
+        "bar(L) -> #{K1 => V1, K2 => V2 || K := V <- L}.",
+        &[(
+            "#{K1 => V1, K2 => V2 || K := V <- L}",
+            &[
+                ("_@K1", &["K1"]),
+                ("_@K2", &["K2"]),
+                ("_@Map", &["L"]),
+                ("_@V1", &["V1"]),
+                ("_@V2", &["V2"]),
+            ],
+        )],
+    );
+}
+
+#[test]
 fn ssr_expr_zip_comprehension() {
     assert_matches(
         "ssr: [_@A || XX <- _@List && YY <- _@B, _@Cond].",

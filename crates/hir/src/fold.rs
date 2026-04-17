@@ -798,14 +798,21 @@ impl<'a, T> FoldCtx<'a, T> {
                 };
                 args.iter().fold(r, |acc, arg| self.do_fold_expr(*arg, acc))
             }
-            crate::Expr::Comprehension { builder, exprs } => match builder {
-                ComprehensionBuilder::List(expr) => self.fold_comprehension(expr, exprs, acc),
-                ComprehensionBuilder::Binary(expr) => self.fold_comprehension(expr, exprs, acc),
-                ComprehensionBuilder::Map(key, value) => {
-                    let r = self.fold_comprehension(key, exprs, acc);
-                    self.fold_comprehension(value, exprs, r)
-                }
-            },
+            crate::Expr::Comprehension { builder, exprs } => {
+                let r = match builder {
+                    ComprehensionBuilder::List(template_exprs) => template_exprs
+                        .iter()
+                        .fold(acc, |acc, expr| self.do_fold_expr(*expr, acc)),
+                    ComprehensionBuilder::Binary(expr) => self.do_fold_expr(*expr, acc),
+                    ComprehensionBuilder::Map(fields) => {
+                        fields.iter().fold(acc, |acc, (key, value)| {
+                            let r = self.do_fold_expr(*key, acc);
+                            self.do_fold_expr(*value, r)
+                        })
+                    }
+                };
+                self.fold_comprehension_exprs(exprs, r)
+            }
             crate::Expr::Block { exprs } => exprs
                 .iter()
                 .fold(acc, |acc, expr_id| self.do_fold_expr(*expr_id, acc)),
@@ -1031,9 +1038,8 @@ impl<'a, T> FoldCtx<'a, T> {
         })
     }
 
-    fn fold_comprehension(&mut self, expr: &ExprId, exprs: &[ComprehensionExpr], initial: T) -> T {
-        let r = self.do_fold_expr(*expr, initial);
-        exprs.iter().fold(r, |acc, comprehension_expr| {
+    fn fold_comprehension_exprs(&mut self, exprs: &[ComprehensionExpr], initial: T) -> T {
+        exprs.iter().fold(initial, |acc, comprehension_expr| {
             self.fold_comprehension_expr(acc, comprehension_expr)
         })
     }

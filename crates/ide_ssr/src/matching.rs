@@ -1298,12 +1298,18 @@ impl PatternIterator {
                 }),
                 Expr::Comprehension { builder, exprs } => {
                     let bs: Vec<SubId> = match builder {
-                        ComprehensionBuilder::List(e) => vec![(*e).into()],
+                        ComprehensionBuilder::List(exprs) => {
+                            exprs.iter().map(|e| (*e).into()).collect()
+                        }
                         ComprehensionBuilder::Binary(e) => vec![(*e).into()],
-                        ComprehensionBuilder::Map(k, v) => vec![(*k).into(), (*v).into()],
+                        ComprehensionBuilder::Map(fields) => fields
+                            .iter()
+                            .flat_map(|(k, v)| [(*k).into(), (*v).into()])
+                            .collect(),
                     };
                     PatternIterator::as_pattern_list(
                         bs.into_iter()
+                            .chain(iter::once("||".into()))
                             .chain(
                                 exprs
                                     .iter()

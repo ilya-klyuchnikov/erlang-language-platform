@@ -541,15 +541,19 @@ fn compute_expr_scopes(
                 compute_comprehension_expr_scopes(body, scopes, &mut sub_vt, scope, expr);
             }
             match builder {
-                ComprehensionBuilder::List(expr) => {
-                    compute_expr_scopes(*expr, body, scopes, scope, &mut sub_vt)
+                ComprehensionBuilder::List(exprs) => {
+                    for expr in exprs {
+                        compute_expr_scopes(*expr, body, scopes, scope, &mut sub_vt);
+                    }
                 }
                 ComprehensionBuilder::Binary(expr) => {
                     compute_expr_scopes(*expr, body, scopes, scope, &mut sub_vt)
                 }
-                ComprehensionBuilder::Map(key, value) => {
-                    compute_expr_scopes(*key, body, scopes, scope, &mut sub_vt);
-                    compute_expr_scopes(*value, body, scopes, scope, &mut sub_vt)
+                ComprehensionBuilder::Map(fields) => {
+                    for (key, value) in fields {
+                        compute_expr_scopes(*key, body, scopes, scope, &mut sub_vt);
+                        compute_expr_scopes(*value, body, scopes, scope, &mut sub_vt);
+                    }
                 }
             }
         }

@@ -722,10 +722,12 @@ impl<'a> Printer<'a> {
                 self.print_herald("Expr::Comprehension", &mut |this| {
                     this.print_labelled("builder", true, &mut |this| {
                         match builder {
-                            ComprehensionBuilder::List(expr) => {
+                            ComprehensionBuilder::List(exprs) => {
                                 this.print_herald("ComprehensionBuilder::List", &mut |this| {
-                                    this.print_expr(expr);
-                                    writeln!(this).ok();
+                                    for expr in exprs {
+                                        this.print_expr(expr);
+                                        writeln!(this).ok();
+                                    }
                                 });
                             }
                             ComprehensionBuilder::Binary(expr) => {
@@ -734,13 +736,15 @@ impl<'a> Printer<'a> {
                                     writeln!(this).ok();
                                 });
                             }
-                            ComprehensionBuilder::Map(expr1, expr2) => {
+                            ComprehensionBuilder::Map(fields) => {
                                 this.print_herald("ComprehensionBuilder::Map", &mut |this| {
-                                    this.print_expr(expr1);
-                                    writeln!(this).ok();
-                                    writeln!(this, "=>").ok();
-                                    this.print_expr(expr2);
-                                    writeln!(this).ok();
+                                    for (expr1, expr2) in fields {
+                                        this.print_expr(expr1);
+                                        writeln!(this).ok();
+                                        writeln!(this, "=>").ok();
+                                        this.print_expr(expr2);
+                                        writeln!(this).ok();
+                                    }
                                 });
                             }
                         };
@@ -2273,6 +2277,27 @@ mod tests {
                                     Expr<3>:Expr::Var(Map)
                                 },
                         },
+                }.
+            "#]],
+        );
+    }
+
+    #[test]
+    fn expr_via_fun_map_comprehension_exact_is_missing() {
+        // `:=` in map comprehension template is invalid;
+        // the erlang_service will report the error.
+        check(
+            r#"
+            foo() ->
+              #{KK := VV || KK := VV <- Map}.
+            "#,
+            expect![[r#"
+                function: foo/0
+                Clause {
+                    pats
+                    guards
+                    exprs
+                        Expr<1>:Expr::Missing,
                 }.
             "#]],
         );
