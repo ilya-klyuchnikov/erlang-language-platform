@@ -760,7 +760,9 @@ mod tests {
         let name = function_clause.name();
         let name = match name.unwrap() {
             ast::Name::Atom(a) => a,
-            ast::Name::Var(_) | ast::Name::MacroCallExpr(_) => todo!(),
+            ast::Name::Var(_) | ast::Name::MacroCallExpr(_) => {
+                panic!("expected Atom name in api_walkthrough test")
+            }
         };
         assert_eq!(name.raw_text(), "foo");
 

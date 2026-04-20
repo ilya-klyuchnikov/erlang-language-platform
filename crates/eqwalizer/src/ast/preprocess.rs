@@ -37,7 +37,7 @@ use elp_types_db::eqwalizer::transformer::Transformer;
 
 use crate::ast;
 
-const PREDICATES: LazyLock<BTreeSet<ast::Id>> = LazyLock::new(|| {
+static PREDICATES: LazyLock<BTreeSet<ast::Id>> = LazyLock::new(|| {
     BTreeSet::from_iter(
         [
             "is_atom/1",
@@ -62,7 +62,7 @@ const PREDICATES: LazyLock<BTreeSet<ast::Id>> = LazyLock::new(|| {
     )
 });
 
-const BINOP: LazyLock<BTreeSet<StringId>> = LazyLock::new(|| {
+static BINOP: LazyLock<BTreeSet<StringId>> = LazyLock::new(|| {
     BTreeSet::from_iter(
         [
             "/", "*", "-", "+", "div", "rem", "band", "bor", "bxor", "bsl", "bsr", "or", "xor",
@@ -72,7 +72,7 @@ const BINOP: LazyLock<BTreeSet<StringId>> = LazyLock::new(|| {
     )
 });
 
-const UNOP: LazyLock<BTreeSet<StringId>> =
+static UNOP: LazyLock<BTreeSet<StringId>> =
     LazyLock::new(|| BTreeSet::from_iter(["bnot", "+", "-", "not"].map(|s| s.into())));
 
 fn as_test(expr: Expr) -> Option<Test> {

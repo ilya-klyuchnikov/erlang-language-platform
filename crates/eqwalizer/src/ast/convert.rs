@@ -171,7 +171,7 @@ use super::auto_import;
 use super::compiler_macro;
 use crate::ast;
 
-const ERLANG: LazyLock<StringId> = LazyLock::new(|| StringId::from("erlang"));
+static ERLANG: LazyLock<StringId> = LazyLock::new(|| StringId::from("erlang"));
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Converter {

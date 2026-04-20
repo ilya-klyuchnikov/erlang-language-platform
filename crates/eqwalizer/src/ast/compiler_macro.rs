@@ -15,9 +15,9 @@ use elp_types_db::StringId;
 
 use crate::ast;
 
-pub const FAKE_MODULE: LazyLock<StringId> = LazyLock::new(|| StringId::from("$compiler_macro"));
+pub static FAKE_MODULE: LazyLock<StringId> = LazyLock::new(|| StringId::from("$compiler_macro"));
 
-const FUNS: LazyLock<BTreeSet<ast::Id>> = LazyLock::new(|| {
+static FUNS: LazyLock<BTreeSet<ast::Id>> = LazyLock::new(|| {
     BTreeSet::from_iter(["record_info/2"].map(|s| s.parse().expect("valid Id literal")))
 });
 

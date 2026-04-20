@@ -72,11 +72,16 @@ impl Type {
         Type::AtomLitType(AtomLitType { atom: lit })
     }
 
-    pub const FALSE_TYPE: LazyLock<Type> =
-        LazyLock::new(|| Type::atom_lit_type(StringId::from("false")));
+    pub fn false_type() -> Type {
+        static TYPE: LazyLock<Type> =
+            LazyLock::new(|| Type::atom_lit_type(StringId::from("false")));
+        TYPE.clone()
+    }
 
-    pub const TRUE_TYPE: LazyLock<Type> =
-        LazyLock::new(|| Type::atom_lit_type(StringId::from("true")));
+    pub fn true_type() -> Type {
+        static TYPE: LazyLock<Type> = LazyLock::new(|| Type::atom_lit_type(StringId::from("true")));
+        TYPE.clone()
+    }
 
     pub const CHAR_TYPE: Type = Type::NumberType;
 
@@ -84,11 +89,14 @@ impl Type {
 
     pub const FLOAT_TYPE: Type = Type::NumberType;
 
-    pub const UNDEFINED: LazyLock<Type> =
-        LazyLock::new(|| Type::atom_lit_type(StringId::from("undefined")));
+    pub fn undefined() -> Type {
+        static TYPE: LazyLock<Type> =
+            LazyLock::new(|| Type::atom_lit_type(StringId::from("undefined")));
+        TYPE.clone()
+    }
 
     pub fn exn_class_type() -> Type {
-        const TYPE: LazyLock<Type> = LazyLock::new(|| {
+        static TYPE: LazyLock<Type> = LazyLock::new(|| {
             Type::UnionType(UnionType {
                 tys: vec![
                     Type::atom_lit_type(StringId::from("error")),
@@ -101,7 +109,7 @@ impl Type {
     }
 
     pub fn cls_exn_stack_type() -> Type {
-        const TYPE: LazyLock<Type> = LazyLock::new(|| {
+        static TYPE: LazyLock<Type> = LazyLock::new(|| {
             Type::UnionType(UnionType {
                 tys: vec![
                     Type::exn_class_type(),
@@ -116,7 +124,7 @@ impl Type {
     }
 
     pub fn cls_exn_stack_type_dynamic() -> Type {
-        const TYPE: LazyLock<Type> = LazyLock::new(|| {
+        static TYPE: LazyLock<Type> = LazyLock::new(|| {
             Type::UnionType(UnionType {
                 tys: vec![
                     Type::exn_class_type(),
@@ -172,7 +180,7 @@ impl Type {
                 t: Box::new(Type::CHAR_TYPE),
             })),
             "boolean" => Some(Type::UnionType(UnionType {
-                tys: vec![Type::FALSE_TYPE.clone(), Type::TRUE_TYPE.clone()],
+                tys: vec![Type::false_type(), Type::true_type()],
             })),
             "timeout" => Some(Type::UnionType(UnionType {
                 tys: vec![

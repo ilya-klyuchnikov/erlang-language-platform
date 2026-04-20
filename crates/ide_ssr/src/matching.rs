@@ -1520,8 +1520,12 @@ impl PatternIterator {
                 ),
                 Pat::Paren { pat } => PatternIterator::as_pattern_list(vec![(*pat).into()]),
             },
-            AnyExprRef::TypeExpr(_) => todo!(),
-            AnyExprRef::Term(_) => todo!(),
+            AnyExprRef::TypeExpr(_) => {
+                panic!("PatternIterator not implemented for TypeExpr")
+            }
+            AnyExprRef::Term(_) => {
+                panic!("PatternIterator not implemented for Term")
+            }
         }
     }
 

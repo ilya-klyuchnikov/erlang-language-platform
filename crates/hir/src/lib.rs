@@ -266,7 +266,6 @@ impl HirIdx {
                 }
             }
             BodyOrigin::FormIdx { file_id, form_id } => match form_id {
-                FormIdx::ModuleAttribute(_) => todo!(),
                 FormIdx::FunctionClause(fun_idx) => {
                     let body = sema.db.function_clause_body(InFile::new(file_id, fun_idx));
                     body.body.tree_print_any_expr(sema.db.upcast(), self.idx)

@@ -13,7 +13,7 @@ use std::sync::LazyLock;
 
 use crate::ast;
 
-const FUNS: LazyLock<BTreeSet<ast::Id>> = LazyLock::new(|| {
+static FUNS: LazyLock<BTreeSet<ast::Id>> = LazyLock::new(|| {
     BTreeSet::from_iter(
         [
             "abs/1",
