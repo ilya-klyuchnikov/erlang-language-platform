@@ -757,3 +757,22 @@ gen_shape(#{a := {A}, b := {B}}) -> {A, B}.
 
 -spec gen_shape_app(#{a := {atom()}, dynamic() => dynamic()}) -> {atom(), atom()}.
 gen_shape_app(Shape) -> gen_shape(Shape).
+
+-spec props_get(K, [{K, V}], V) -> V.
+props_get(Key, List, Default) ->
+    case lists:keyfind(Key, 1, List) of
+        {_, Value} ->
+            Value;
+        _ ->
+            Default
+    end.
+
+-spec props_get_test({error, term()} | [{atom(), binary()}]) -> error | {error, atom()}.
+props_get_test(Props) ->
+    % we expect an error here
+    V = props_get(key, Props, undefined),
+    case V of
+        undefined -> error;
+        % we expect an error here
+        Z -> {Z}
+    end.
