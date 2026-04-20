@@ -22,6 +22,7 @@ use hir::fold::ParenStrategy;
 use lazy_static::lazy_static;
 
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -118,10 +119,9 @@ impl SsrPatternsLinter for UnnecessaryMapToListInComprehensionLinter {
         &self,
         _context: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        if let Some(comments) = matched.comments(sema) {
+        if let Some(comments) = matched.comments(ctx.sema) {
             // Avoid clobbering comments in the original source code
             if !comments.is_empty() {
                 return None;
@@ -134,20 +134,19 @@ impl SsrPatternsLinter for UnnecessaryMapToListInComprehensionLinter {
         &self,
         strictness: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<elp_ide_assists::Assist>> {
         let inefficient_comprehension_range = matched.range.range;
-        let body = matched.placeholder_text(sema, BODY_VAR)?;
-        let key = matched.placeholder_text(sema, KEY_VAR)?;
-        let value = matched.placeholder_text(sema, VALUE_VAR)?;
-        let map = matched.placeholder_text(sema, MAP_VAR)?;
+        let body = matched.placeholder_text(ctx.sema, BODY_VAR)?;
+        let key = matched.placeholder_text(ctx.sema, KEY_VAR)?;
+        let value = matched.placeholder_text(ctx.sema, VALUE_VAR)?;
+        let map = matched.placeholder_text(ctx.sema, MAP_VAR)?;
 
-        let cond1 = matched.placeholder_text(sema, COND1_VAR);
-        let cond2 = matched.placeholder_text(sema, COND2_VAR);
-        let cond3 = matched.placeholder_text(sema, COND3_VAR);
+        let cond1 = matched.placeholder_text(ctx.sema, COND1_VAR);
+        let cond2 = matched.placeholder_text(ctx.sema, COND2_VAR);
+        let cond3 = matched.placeholder_text(ctx.sema, COND3_VAR);
 
-        let mut builder = SourceChangeBuilder::new(file_id);
+        let mut builder = SourceChangeBuilder::new(ctx.file_id);
         let conds = vec![cond1, cond2, cond3]
             .into_iter()
             .flatten()

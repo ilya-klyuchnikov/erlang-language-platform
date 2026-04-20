@@ -50,6 +50,7 @@ use lazy_static::lazy_static;
 
 use crate::Assist;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -206,18 +207,17 @@ impl SsrPatternsLinter for MapFindToSyntaxLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        if let Some(comments) = matched.comments(sema)
+        if let Some(comments) = matched.comments(ctx.sema)
             && !comments.is_empty()
         {
             return None;
         }
-        let key = matched.get_placeholder_match(sema, KEY_VAR)?;
-        let value = matched.get_placeholder_match(sema, VALUE_VAR)?;
-        let maybe_value2 = matched.get_placeholder_match(sema, VALUE_VAR2);
-        let body_arc = matched.matched_node_body.get_body(sema)?;
+        let key = matched.get_placeholder_match(ctx.sema, KEY_VAR)?;
+        let value = matched.get_placeholder_match(ctx.sema, VALUE_VAR)?;
+        let maybe_value2 = matched.get_placeholder_match(ctx.sema, VALUE_VAR2);
+        let body_arc = matched.matched_node_body.get_body(ctx.sema)?;
         let body = body_arc.as_ref();
         if !is_match_valid_pat(body, key) || !is_match_valid_pat(body, value) {
             return Some(false);
@@ -234,12 +234,11 @@ impl SsrPatternsLinter for MapFindToSyntaxLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         let old_query_range = matched.range.range;
-        let mut builder = SourceChangeBuilder::new(file_id);
-        let map_syntax_replacement = get_map_syntax_replacement(sema, matched)?;
+        let mut builder = SourceChangeBuilder::new(ctx.file_id);
+        let map_syntax_replacement = get_map_syntax_replacement(ctx.sema, matched)?;
         builder.replace(old_query_range, map_syntax_replacement);
         Some(vec![fix(
             "maps_find_rather_than_syntax",

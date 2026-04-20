@@ -22,6 +22,7 @@ use lazy_static::lazy_static;
 use crate::Assist;
 use crate::diagnostics::Category;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -79,10 +80,9 @@ impl SsrPatternsLinter for InefficientLastLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        if let Some(comments) = matched.comments(sema)
+        if let Some(comments) = matched.comments(ctx.sema)
             && !comments.is_empty()
         {
             return None;
@@ -94,12 +94,11 @@ impl SsrPatternsLinter for InefficientLastLinter {
         &self,
         context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         match context {
-            PatternKind::Hd | PatternKind::Nth => make_fix_hd(sema, file_id, matched),
-            PatternKind::Pat => make_fix_pat(sema, file_id, matched),
+            PatternKind::Hd | PatternKind::Nth => make_fix_hd(ctx.sema, ctx.file_id, matched),
+            PatternKind::Pat => make_fix_pat(ctx.sema, ctx.file_id, matched),
         }
     }
 

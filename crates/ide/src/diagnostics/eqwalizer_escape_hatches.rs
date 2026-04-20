@@ -181,8 +181,8 @@ impl SsrPatternsLinter for UncheckedCastLinter {
         }
     }
 
-    fn scope(&self, file_id: FileId) -> SsrSearchScope {
-        SsrSearchScope::WholeFile(file_id)
+    fn scope(&self, ctx: &LinterContext) -> SsrSearchScope {
+        SsrSearchScope::WholeFile(ctx.file_id)
     }
 }
 

@@ -27,6 +27,7 @@ use lazy_static::lazy_static;
 
 use crate::Assist;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -97,18 +98,17 @@ impl SsrPatternsLinter for ListsMapToComprehensionLinter {
         &self,
         context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        if let Some(comments) = matched.comments(sema)
+        if let Some(comments) = matched.comments(ctx.sema)
             && !comments.is_empty()
         {
             return None;
         }
 
         if *context == PatternKind::FunVar {
-            let fun_placeholder = matched.get_placeholder_match(sema, FUN_VAR)?;
-            if !is_placeholder_a_var_from_sema_and_match(sema, matched, &fun_placeholder) {
+            let fun_placeholder = matched.get_placeholder_match(ctx.sema, FUN_VAR)?;
+            if !is_placeholder_a_var_from_sema_and_match(ctx.sema, matched, &fun_placeholder) {
                 return None;
             }
         }
@@ -120,34 +120,33 @@ impl SsrPatternsLinter for ListsMapToComprehensionLinter {
         &self,
         context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         let call_range = matched.range.range;
-        let list = matched.placeholder_text(sema, LIST_VAR)?;
+        let list = matched.placeholder_text(ctx.sema, LIST_VAR)?;
 
         let comprehension = match context {
             PatternKind::AnonymousFun => {
-                let var = matched.placeholder_text(sema, ELEM_VAR)?;
-                let body = matched.placeholder_text(sema, BODY_VAR)?;
+                let var = matched.placeholder_text(ctx.sema, ELEM_VAR)?;
+                let body = matched.placeholder_text(ctx.sema, BODY_VAR)?;
                 format!("[{body} || {var} <:- {list}]")
             }
             PatternKind::LocalFunRef => {
-                let fun = matched.placeholder_text(sema, FUN_VAR)?;
+                let fun = matched.placeholder_text(ctx.sema, FUN_VAR)?;
                 format!("[{fun}(Elem) || Elem <:- {list}]")
             }
             PatternKind::RemoteFunRef => {
-                let module = matched.placeholder_text(sema, MOD_VAR)?;
-                let fun = matched.placeholder_text(sema, FUN_VAR)?;
+                let module = matched.placeholder_text(ctx.sema, MOD_VAR)?;
+                let fun = matched.placeholder_text(ctx.sema, FUN_VAR)?;
                 format!("[{module}:{fun}(Elem) || Elem <:- {list}]")
             }
             PatternKind::FunVar => {
-                let fun = matched.placeholder_text(sema, FUN_VAR)?;
+                let fun = matched.placeholder_text(ctx.sema, FUN_VAR)?;
                 format!("[{fun}(Elem) || Elem <:- {list}]")
             }
         };
 
-        let mut builder = SourceChangeBuilder::new(file_id);
+        let mut builder = SourceChangeBuilder::new(ctx.file_id);
         builder.replace(call_range, comprehension);
         let fixes = vec![fix(
             "lists_map_to_comprehension",

@@ -60,6 +60,7 @@ use crate::Assist;
 use crate::codemod_helpers::is_wildcard;
 use crate::diagnostics::Category;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -207,28 +208,27 @@ impl SsrPatternsLinter for EqualityCheckWithUnnecessaryOperatorLinter {
         &self,
         context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        if let Some(comments) = matched.comments(sema)
+        if let Some(comments) = matched.comments(ctx.sema)
             && !comments.is_empty()
         {
             return None;
         }
-        let lhs = &matched.get_placeholder_match(sema, LHS_VAR)?;
-        let rhs = &matched.get_placeholder_match(sema, RHS_VAR)?;
-        let wildcard = &matched.get_placeholder_match(sema, UNDERSCORE_VAR);
-        let body_arc = matched.matched_node_body.get_body(sema)?;
+        let lhs = &matched.get_placeholder_match(ctx.sema, LHS_VAR)?;
+        let rhs = &matched.get_placeholder_match(ctx.sema, RHS_VAR)?;
+        let wildcard = &matched.get_placeholder_match(ctx.sema, UNDERSCORE_VAR);
+        let body_arc = matched.matched_node_body.get_body(ctx.sema)?;
         let body = body_arc.as_ref();
         let underscore_expected = *context == PatternContext::Wildcard;
-        if !check_underscore(sema, body, wildcard, underscore_expected) {
+        if !check_underscore(ctx.sema, body, wildcard, underscore_expected) {
             return Some(false);
         }
-        if is_length_zero_comparison(sema, body, lhs, rhs) {
+        if is_length_zero_comparison(ctx.sema, body, lhs, rhs) {
             return None;
         }
-        let lhs_as_pattern_priority = pattern_priority(sema, body, lhs);
-        let rhs_as_pattern_priority = pattern_priority(sema, body, rhs);
+        let lhs_as_pattern_priority = pattern_priority(ctx.sema, body, lhs);
+        let rhs_as_pattern_priority = pattern_priority(ctx.sema, body, rhs);
         match (lhs_as_pattern_priority, rhs_as_pattern_priority) {
             (Some(_), _) | (_, Some(_)) => Some(true),
             (None, None) => Some(false),
@@ -239,20 +239,19 @@ impl SsrPatternsLinter for EqualityCheckWithUnnecessaryOperatorLinter {
         &self,
         context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
-        let lhs = &matched.get_placeholder_match(sema, LHS_VAR)?;
-        let rhs = &matched.get_placeholder_match(sema, RHS_VAR)?;
-        let wildcard = &matched.get_placeholder_match(sema, UNDERSCORE_VAR);
-        let body_arc = matched.matched_node_body.get_body(sema)?;
+        let lhs = &matched.get_placeholder_match(ctx.sema, LHS_VAR)?;
+        let rhs = &matched.get_placeholder_match(ctx.sema, RHS_VAR)?;
+        let wildcard = &matched.get_placeholder_match(ctx.sema, UNDERSCORE_VAR);
+        let body_arc = matched.matched_node_body.get_body(ctx.sema)?;
         let body = body_arc.as_ref();
         let underscore_expected = *context == PatternContext::Wildcard;
-        if !check_underscore(sema, body, wildcard, underscore_expected) {
+        if !check_underscore(ctx.sema, body, wildcard, underscore_expected) {
             return None;
         }
-        let lhs_as_pattern_priority = pattern_priority(sema, body, lhs);
-        let rhs_as_pattern_priority = pattern_priority(sema, body, rhs);
+        let lhs_as_pattern_priority = pattern_priority(ctx.sema, body, lhs);
+        let rhs_as_pattern_priority = pattern_priority(ctx.sema, body, rhs);
         let (discriminee, pattern) = match (lhs_as_pattern_priority, rhs_as_pattern_priority) {
             (Some(left), Some(right)) => match left.cmp(&right) {
                 Ordering::Less => (lhs, rhs),
@@ -263,16 +262,16 @@ impl SsrPatternsLinter for EqualityCheckWithUnnecessaryOperatorLinter {
             (None, Some(_)) => (lhs, rhs),
             (None, None) => return None,
         };
-        make_fix(sema, file_id, matched, body, discriminee, pattern)
+        make_fix(ctx.sema, ctx.file_id, matched, body, discriminee, pattern)
     }
 
     fn add_categories(&self, _context: &Self::Context) -> Vec<Category> {
         vec![Category::SimplificationRule]
     }
 
-    fn range(&self, sema: &Semantic, matched: &Match) -> Option<TextRange> {
-        let discriminee_lhs_range = matched.placeholder_range(sema, LHS_VAR)?;
-        let discriminee_rhs_range = matched.placeholder_range(sema, RHS_VAR)?;
+    fn range(&self, ctx: &LinterContext, matched: &Match) -> Option<TextRange> {
+        let discriminee_lhs_range = matched.placeholder_range(ctx.sema, LHS_VAR)?;
+        let discriminee_rhs_range = matched.placeholder_range(ctx.sema, RHS_VAR)?;
         Some(discriminee_lhs_range.cover(discriminee_rhs_range))
     }
 }

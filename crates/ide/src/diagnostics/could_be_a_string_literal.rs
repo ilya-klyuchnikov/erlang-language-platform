@@ -23,6 +23,7 @@ use lazy_static::lazy_static;
 
 use crate::Assist;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -111,26 +112,25 @@ impl SsrPatternsLinter for CouldBeAStringLiteralLinter {
         &self,
         context: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        if let Some(comments) = matched.comments(sema) {
+        if let Some(comments) = matched.comments(ctx.sema) {
             // Avoid clobbering comments in the original source code
             if !comments.is_empty() {
                 return None;
             }
         }
 
-        if let Some(true) = matched.placeholder_is_macro(sema, STRING_VAR) {
+        if let Some(true) = matched.placeholder_is_macro(ctx.sema, STRING_VAR) {
             None
         } else {
             match context.from {
                 StringKind::List => Some(Option::is_some(
-                    &matched.placeholder_is_string(sema, STRING_VAR),
+                    &matched.placeholder_is_string(ctx.sema, STRING_VAR),
                 )),
                 StringKind::Binary => None, // Possible future work
                 StringKind::Atom => Some(Option::is_some(
-                    &matched.placeholder_is_atom(sema, STRING_VAR),
+                    &matched.placeholder_is_atom(ctx.sema, STRING_VAR),
                 )),
             }
         }
@@ -140,18 +140,17 @@ impl SsrPatternsLinter for CouldBeAStringLiteralLinter {
         &self,
         context: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         let unnecessary_non_literal_range = matched.range.range;
-        let mut builder = SourceChangeBuilder::new(file_id);
+        let mut builder = SourceChangeBuilder::new(ctx.file_id);
         match *context {
             StringRewrite {
                 from: StringKind::List,
                 to: StringKind::Binary,
             } => {
                 if let StringVariant::Normal(list_string_value) =
-                    matched.placeholder_is_string(sema, STRING_VAR)?
+                    matched.placeholder_is_string(ctx.sema, STRING_VAR)?
                 {
                     builder.replace(
                         unnecessary_non_literal_range,
@@ -172,7 +171,7 @@ impl SsrPatternsLinter for CouldBeAStringLiteralLinter {
                 to: StringKind::Atom,
             } => {
                 if let StringVariant::Normal(list_string_value) =
-                    matched.placeholder_is_string(sema, STRING_VAR)?
+                    matched.placeholder_is_string(ctx.sema, STRING_VAR)?
                 {
                     builder.replace(
                         unnecessary_non_literal_range,
@@ -192,10 +191,10 @@ impl SsrPatternsLinter for CouldBeAStringLiteralLinter {
                 from: StringKind::Atom,
                 to: StringKind::List,
             } => {
-                let atom = matched.placeholder_is_atom(sema, STRING_VAR)?;
+                let atom = matched.placeholder_is_atom(ctx.sema, STRING_VAR)?;
                 builder.replace(
                     unnecessary_non_literal_range,
-                    escape_and_quote_string(&atom.as_string(sema.db.upcast())),
+                    escape_and_quote_string(&atom.as_string(ctx.sema.db.upcast())),
                 );
                 Some(vec![fix(
                     "rewrite_as_a_string_literal",
@@ -208,8 +207,9 @@ impl SsrPatternsLinter for CouldBeAStringLiteralLinter {
                 from: StringKind::Atom,
                 to: StringKind::Binary,
             } => {
-                let atom = matched.placeholder_is_atom(sema, STRING_VAR)?;
-                let list_string = escape_and_quote_binary_string(&atom.as_string(sema.db.upcast()));
+                let atom = matched.placeholder_is_atom(ctx.sema, STRING_VAR)?;
+                let list_string =
+                    escape_and_quote_binary_string(&atom.as_string(ctx.sema.db.upcast()));
                 builder.replace(unnecessary_non_literal_range, list_string);
                 Some(vec![fix(
                     "rewrite_as_a_binary_string_literal",

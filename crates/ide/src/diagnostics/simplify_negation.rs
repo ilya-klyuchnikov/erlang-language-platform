@@ -44,6 +44,7 @@ use lazy_static::lazy_static;
 use crate::Assist;
 use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -136,25 +137,24 @@ impl SsrPatternsLinter for SimplifyNegationLinter {
         }
     }
 
-    fn range(&self, sema: &Semantic, matched: &Match) -> Option<TextRange> {
-        matched.placeholder_range(sema, NEGATED_EXPR_VAR)
+    fn range(&self, ctx: &LinterContext, matched: &Match) -> Option<TextRange> {
+        matched.placeholder_range(ctx.sema, NEGATED_EXPR_VAR)
     }
 
     fn fixes(
         &self,
         context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
-        if let Some(comments) = matched.comments(sema)
+        if let Some(comments) = matched.comments(ctx.sema)
             && !comments.is_empty()
         {
             return None;
         }
         let old_conditional_range = matched.range.range;
-        let replacement_text = get_replacement(sema, matched, *context)?;
-        let mut builder = SourceChangeBuilder::new(file_id);
+        let replacement_text = get_replacement(ctx.sema, matched, *context)?;
+        let mut builder = SourceChangeBuilder::new(ctx.file_id);
         builder.replace(old_conditional_range, replacement_text);
         Some(vec![fix(
             "simplify_negation",

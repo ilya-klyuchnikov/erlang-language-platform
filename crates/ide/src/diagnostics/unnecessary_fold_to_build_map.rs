@@ -35,6 +35,7 @@ use lazy_static::lazy_static;
 
 use crate::Assist;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -95,18 +96,17 @@ impl SsrPatternsLinter for UnnecessaryFoldToBuildMapLinter {
         &self,
         context: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        if let Some(comments) = matched.comments(sema) {
+        if let Some(comments) = matched.comments(ctx.sema) {
             // Avoid clobbering comments in the original source code
             if !comments.is_empty() {
                 return None;
             }
         }
         match context {
-            PatternKind::FromList => from_list_match_is_valid(sema, matched),
-            PatternKind::FromKeys => from_keys_match_is_valid(sema, matched),
+            PatternKind::FromList => from_list_match_is_valid(ctx.sema, matched),
+            PatternKind::FromKeys => from_keys_match_is_valid(ctx.sema, matched),
         }
     }
 
@@ -114,12 +114,11 @@ impl SsrPatternsLinter for UnnecessaryFoldToBuildMapLinter {
         &self,
         context: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         match context {
-            PatternKind::FromList => from_list_fixes(sema, file_id, matched),
-            PatternKind::FromKeys => from_keys_fixes(sema, file_id, matched),
+            PatternKind::FromList => from_list_fixes(ctx.sema, ctx.file_id, matched),
+            PatternKind::FromKeys => from_keys_fixes(ctx.sema, ctx.file_id, matched),
         }
     }
 }

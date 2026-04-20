@@ -14,16 +14,15 @@
 
 use elp_ide_assists::Assist;
 use elp_ide_db::DiagnosticCode;
-use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::source_change::SourceChangeBuilder;
 use elp_ide_ssr::Match;
 use elp_syntax::AstNode;
 use elp_syntax::SyntaxKind;
 use elp_syntax::TextRange;
-use hir::Semantic;
 use lazy_static::lazy_static;
 
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
 
@@ -67,8 +66,8 @@ impl SsrPatternsLinter for NoAndOrLinter {
         }
     }
 
-    fn range(&self, sema: &Semantic, matched: &Match) -> Option<TextRange> {
-        let source_file = sema.parse(matched.range.file_id);
+    fn range(&self, ctx: &LinterContext, matched: &Match) -> Option<TextRange> {
+        let source_file = ctx.sema.parse(matched.range.file_id);
         let syntax = source_file.value.syntax();
         let node = syntax.covering_element(matched.range.range);
 
@@ -87,11 +86,10 @@ impl SsrPatternsLinter for NoAndOrLinter {
         &self,
         context: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
-        let left_match = matched.placeholder_text(sema, LHS)?;
-        let right_match = matched.placeholder_text(sema, RHS)?;
+        let left_match = matched.placeholder_text(ctx.sema, LHS)?;
+        let right_match = matched.placeholder_text(ctx.sema, RHS)?;
 
         let (replacement_op, fix_id, fix_label) = match context {
             OperatorKind::And => ("andalso", "and_to_andalso", "Replace `and` with `andalso`"),

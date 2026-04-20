@@ -27,6 +27,7 @@ use lazy_static::lazy_static;
 use crate::Assist;
 use crate::diagnostics::Category;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -82,10 +83,9 @@ impl SsrPatternsLinter for InefficientEnumerateLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        if let Some(comments) = matched.comments(sema)
+        if let Some(comments) = matched.comments(ctx.sema)
             && !comments.is_empty()
         {
             return None;
@@ -97,18 +97,17 @@ impl SsrPatternsLinter for InefficientEnumerateLinter {
         &self,
         context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         match context {
             PatternKind::TwoArg => {
-                if is_indexing_from_literal_one(sema, matched) {
-                    make_fix_simple(sema, file_id, matched)
+                if is_indexing_from_literal_one(ctx.sema, matched) {
+                    make_fix_simple(ctx.sema, ctx.file_id, matched)
                 } else {
-                    make_fix_custom_index(sema, file_id, matched)
+                    make_fix_custom_index(ctx.sema, ctx.file_id, matched)
                 }
             }
-            PatternKind::ThreeArg => make_fix_custom_index_and_step(sema, file_id, matched),
+            PatternKind::ThreeArg => make_fix_custom_index_and_step(ctx.sema, ctx.file_id, matched),
         }
     }
 

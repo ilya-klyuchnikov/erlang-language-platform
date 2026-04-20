@@ -28,6 +28,7 @@ use lazy_static::lazy_static;
 use crate::Assist;
 use crate::diagnostics::Category;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -78,12 +79,11 @@ impl SsrPatternsLinter for MapPutToSyntaxLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        let map_match = matched.get_placeholder_match(sema, MAP_VAR)?;
+        let map_match = matched.get_placeholder_match(ctx.sema, MAP_VAR)?;
         Some(is_placeholder_a_var_from_sema_and_match(
-            sema, matched, &map_match,
+            ctx.sema, matched, &map_match,
         ))
     }
 
@@ -91,14 +91,13 @@ impl SsrPatternsLinter for MapPutToSyntaxLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         let range = matched.range.range;
-        let map = matched.placeholder_text(sema, MAP_VAR)?;
-        let key = matched.placeholder_text(sema, KEY_VAR)?;
-        let value = matched.placeholder_text(sema, VALUE_VAR)?;
-        let mut builder = SourceChangeBuilder::new(file_id);
+        let map = matched.placeholder_text(ctx.sema, MAP_VAR)?;
+        let key = matched.placeholder_text(ctx.sema, KEY_VAR)?;
+        let value = matched.placeholder_text(ctx.sema, VALUE_VAR)?;
+        let mut builder = SourceChangeBuilder::new(ctx.file_id);
         builder.replace(range, format!("{map}#{{{key} => {value}}}"));
         Some(vec![fix(
             "maps_put_function_rather_than_syntax",
@@ -157,12 +156,11 @@ impl SsrPatternsLinter for MapUpdateToSyntaxLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        let map_match = matched.get_placeholder_match(sema, MAP_VAR)?;
+        let map_match = matched.get_placeholder_match(ctx.sema, MAP_VAR)?;
         Some(is_placeholder_a_var_from_sema_and_match(
-            sema, matched, &map_match,
+            ctx.sema, matched, &map_match,
         ))
     }
 
@@ -170,14 +168,13 @@ impl SsrPatternsLinter for MapUpdateToSyntaxLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         let range = matched.range.range;
-        let map = matched.placeholder_text(sema, MAP_VAR)?;
-        let key = matched.placeholder_text(sema, KEY_VAR)?;
-        let value = matched.placeholder_text(sema, VALUE_VAR)?;
-        let mut builder = SourceChangeBuilder::new(file_id);
+        let map = matched.placeholder_text(ctx.sema, MAP_VAR)?;
+        let key = matched.placeholder_text(ctx.sema, KEY_VAR)?;
+        let value = matched.placeholder_text(ctx.sema, VALUE_VAR)?;
+        let mut builder = SourceChangeBuilder::new(ctx.file_id);
         builder.replace(range, format!("{map}#{{{key} := {value}}}"));
         Some(vec![fix(
             "maps_update_function_rather_than_syntax",

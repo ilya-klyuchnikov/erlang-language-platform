@@ -854,8 +854,8 @@ pub(crate) trait SsrPatternsLinter: Linter {
     /// matches from a different file than the one being analyzed:
     /// SSR can return matches with file_id from header files due to macro
     /// expansion). Override to allow cross-file matches if needed.
-    fn filter_match(&self, matched: &elp_ide_ssr::Match, file_id: FileId) -> bool {
-        matched.range.file_id == file_id
+    fn filter_match(&self, matched: &elp_ide_ssr::Match, ctx: &LinterContext) -> bool {
+        matched.range.file_id == ctx.file_id
     }
 
     /// Customize the description based on each matched pattern.
@@ -869,8 +869,7 @@ pub(crate) trait SsrPatternsLinter: Linter {
         &self,
         _context: &Self::Context,
         _matched: &elp_ide_ssr::Match,
-        _sema: &Semantic,
-        _file_id: FileId,
+        _ctx: &LinterContext,
     ) -> Option<bool> {
         Some(true)
     }
@@ -880,8 +879,7 @@ pub(crate) trait SsrPatternsLinter: Linter {
         &self,
         _context: &Self::Context,
         _matched: &elp_ide_ssr::Match,
-        _sema: &Semantic,
-        _file_id: FileId,
+        _ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         None
     }
@@ -902,13 +900,13 @@ pub(crate) trait SsrPatternsLinter: Linter {
     }
 
     /// Specify the search scope: the entire file or function definitions only
-    fn scope(&self, file_id: FileId) -> SsrSearchScope {
-        SsrSearchScope::FunctionsOnly(file_id)
+    fn scope(&self, ctx: &LinterContext) -> SsrSearchScope {
+        SsrSearchScope::FunctionsOnly(ctx.file_id)
     }
 
     /// Customize the range of the diagnostic. Default to the range of the entire
     /// matched element.
-    fn range(&self, _sema: &Semantic, _matched: &Match) -> Option<TextRange> {
+    fn range(&self, _ctx: &LinterContext, _matched: &Match) -> Option<TextRange> {
         // Notice we don't default here to the matched range directly,
         // since we want to specify a meaningful in case the user override returns None.
         None
@@ -922,8 +920,7 @@ pub(crate) trait SsrPatternsLinter: Linter {
 pub(crate) trait SsrPatternsDiagnostics: Linter {
     fn diagnostics(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
         severity: Severity,
         cli_severity: Severity,
         linter_config: &SsrPatternsLinterConfig,
@@ -933,8 +930,7 @@ pub(crate) trait SsrPatternsDiagnostics: Linter {
 impl<T: SsrPatternsLinter> SsrPatternsDiagnostics for T {
     fn diagnostics(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
         severity: Severity,
         cli_severity: Severity,
         _linter_config: &SsrPatternsLinterConfig,
@@ -942,17 +938,17 @@ impl<T: SsrPatternsLinter> SsrPatternsDiagnostics for T {
         let mut res = Vec::new();
         for (pattern, context) in self.patterns() {
             let strategy = self.strategy();
-            let scope = self.scope(file_id);
-            let matches = match_pattern(sema, strategy, pattern, scope);
+            let scope = self.scope(ctx);
+            let matches = match_pattern(ctx.sema, strategy, pattern, scope);
             for matched in &matches.matches {
-                if !self.filter_match(matched, file_id) {
+                if !self.filter_match(matched, ctx) {
                     continue;
                 }
-                if Some(true) == self.is_match_valid(context, matched, sema, file_id) {
+                if Some(true) == self.is_match_valid(context, matched, ctx) {
                     let message = self.pattern_description(context);
-                    let fixes = self.fixes(context, matched, sema, file_id);
+                    let fixes = self.fixes(context, matched, ctx);
                     let categories = self.add_categories(context);
-                    let range = match self.range(sema, matched) {
+                    let range = match self.range(ctx, matched) {
                         None => matched.range.range,
                         Some(range) => range,
                     };
@@ -963,8 +959,8 @@ impl<T: SsrPatternsLinter> SsrPatternsDiagnostics for T {
                         .with_cli_severity(cli_severity);
                     if self.can_be_suppressed() {
                         d = d
-                            .with_ignore_fix(sema, file_id)
-                            .with_fixme_fix(sema, file_id);
+                            .with_ignore_fix(ctx.sema, ctx.file_id)
+                            .with_fixme_fix(ctx.sema, ctx.file_id);
                     }
                     res.push(d);
                 }
@@ -2074,13 +2070,9 @@ fn diagnostics_from_linters(
                     } else {
                         SsrPatternsLinterConfig::default()
                     };
-                    let diagnostics = ssr_linter.diagnostics(
-                        sema,
-                        file_id,
-                        severity,
-                        cli_severity,
-                        &linter_config,
-                    );
+                    let ctx = LinterContext { sema, file_id };
+                    let diagnostics =
+                        ssr_linter.diagnostics(&ctx, severity, cli_severity, &linter_config);
                     res.extend(filter_for_manual_section(diagnostics));
                 }
                 DiagnosticLinter::Generic(generic_linter) => {

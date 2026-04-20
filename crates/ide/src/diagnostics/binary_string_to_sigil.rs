@@ -23,6 +23,7 @@ use hir::fold::ParenStrategy;
 use lazy_static::lazy_static;
 
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -63,10 +64,9 @@ impl SsrPatternsLinter for BinaryStringToSigilLinter {
         &self,
         _context: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        let string_content_match_src = matched.placeholder_text(sema, STRING_CONTENT_VAR)?;
+        let string_content_match_src = matched.placeholder_text(ctx.sema, STRING_CONTENT_VAR)?;
         // Only process if the content is a string literal (starts and ends with quotes)
         if !string_content_match_src.starts_with('"') || !string_content_match_src.ends_with('"') {
             return None;
@@ -82,10 +82,9 @@ impl SsrPatternsLinter for BinaryStringToSigilLinter {
         &self,
         _context: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
-        let string_content_match_src = matched.placeholder_text(sema, STRING_CONTENT_VAR)?;
+        let string_content_match_src = matched.placeholder_text(ctx.sema, STRING_CONTENT_VAR)?;
         let mut builder = SourceChangeBuilder::new(matched.range.file_id);
         let sigil_string = format!("~{string_content_match_src}");
         let binary_string_range = matched.range.range;

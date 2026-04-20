@@ -14,13 +14,12 @@
 
 use elp_ide_assists::Assist;
 use elp_ide_db::DiagnosticCode;
-use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::source_change::SourceChangeBuilder;
 use elp_project_model::otp;
-use hir::Semantic;
 use lazy_static::lazy_static;
 
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
 
@@ -57,10 +56,9 @@ impl SsrPatternsLinter for EncodeHexWithCaseLinter {
         &self,
         _context: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
-        let arg_match = matched.placeholder_text(sema, ARG_VAR)?;
+        let arg_match = matched.placeholder_text(ctx.sema, ARG_VAR)?;
         let mut builder = SourceChangeBuilder::new(matched.range.file_id);
         let replacement = format!("binary:encode_hex({arg_match}, lowercase)");
         let range = matched.range.range;

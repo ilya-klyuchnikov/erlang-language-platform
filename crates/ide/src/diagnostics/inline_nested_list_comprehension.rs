@@ -40,6 +40,7 @@ use lazy_static::lazy_static;
 use crate::Assist;
 use crate::diagnostics::Category;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -85,18 +86,17 @@ impl SsrPatternsLinter for InlineNestedListComprehensionLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        if let Some(comments) = matched.comments(sema)
+        if let Some(comments) = matched.comments(ctx.sema)
             && !comments.is_empty()
         {
             return None;
         }
 
-        let _outer_var = matched.placeholder_is_var(sema, OUTER_VAR)?;
+        let _outer_var = matched.placeholder_is_var(ctx.sema, OUTER_VAR)?;
 
-        let occurrence_count = count_var_occurrences_in_body(sema, matched)?;
+        let occurrence_count = count_var_occurrences_in_body(ctx.sema, matched)?;
         if occurrence_count != 1 {
             return None;
         }
@@ -108,21 +108,20 @@ impl SsrPatternsLinter for InlineNestedListComprehensionLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
-        let inner_expr_text = matched.placeholder_text(sema, INNER_EXPR_VAR)?;
-        let inner_var_text = matched.placeholder_text(sema, INNER_VAR)?;
-        let list_text = matched.placeholder_text(sema, LIST_VAR)?;
-        let body_text = matched.placeholder_text(sema, BODY_VAR)?;
-        let body_range = matched.placeholder_range(sema, BODY_VAR)?;
+        let inner_expr_text = matched.placeholder_text(ctx.sema, INNER_EXPR_VAR)?;
+        let inner_var_text = matched.placeholder_text(ctx.sema, INNER_VAR)?;
+        let list_text = matched.placeholder_text(ctx.sema, LIST_VAR)?;
+        let body_text = matched.placeholder_text(ctx.sema, BODY_VAR)?;
+        let body_range = matched.placeholder_range(ctx.sema, BODY_VAR)?;
 
-        let var_range = find_single_var_occurrence_in_body(sema, matched)?;
+        let var_range = find_single_var_occurrence_in_body(ctx.sema, matched)?;
 
         let new_body =
             substitute_var_in_body(&body_text, body_range.start(), &var_range, &inner_expr_text)?;
 
-        let mut builder = SourceChangeBuilder::new(file_id);
+        let mut builder = SourceChangeBuilder::new(ctx.file_id);
         let inlined = format!("[{new_body} || {inner_var_text} <- {list_text}]");
         builder.replace(matched.range.range, inlined);
 

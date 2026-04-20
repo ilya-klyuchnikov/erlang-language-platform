@@ -51,6 +51,7 @@ use lazy_static::lazy_static;
 
 use crate::codemod_helpers::is_wildcard;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -113,27 +114,26 @@ impl SsrPatternsLinter for EtsLookupToLookupElementLinter {
         &self,
         _context: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        if let Some(comments) = matched.comments(sema)
+        if let Some(comments) = matched.comments(ctx.sema)
             && !comments.is_empty()
         {
             return None;
         }
-        let default_match = matched.get_placeholder_match(sema, DEFAULT_VAR)?;
-        let body_arc = matched.matched_node_body.get_body(sema)?;
+        let default_match = matched.get_placeholder_match(ctx.sema, DEFAULT_VAR)?;
+        let body_arc = matched.matched_node_body.get_body(ctx.sema)?;
         let body = body_arc.as_ref();
         if !is_not_a_computation(body, &default_match) {
             return None;
         }
-        let key_text = matched.placeholder_text(sema, KEY_VAR)?;
-        let result_key_text = matched.placeholder_text(sema, RESULT_KEY_VAR)?;
+        let key_text = matched.placeholder_text(ctx.sema, KEY_VAR)?;
+        let result_key_text = matched.placeholder_text(ctx.sema, RESULT_KEY_VAR)?;
         if key_text == result_key_text
             || is_wildcard_match(
-                sema,
+                ctx.sema,
                 body,
-                &matched.get_placeholder_match(sema, RESULT_KEY_VAR),
+                &matched.get_placeholder_match(ctx.sema, RESULT_KEY_VAR),
             )
         {
             Some(true)
@@ -146,12 +146,11 @@ impl SsrPatternsLinter for EtsLookupToLookupElementLinter {
         &self,
         _context: &Self::Context,
         matched: &elp_ide_ssr::Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
-        let tab = matched.placeholder_text(sema, TAB_VAR)?;
-        let key = matched.placeholder_text(sema, KEY_VAR)?;
-        let default = matched.placeholder_text(sema, DEFAULT_VAR)?;
+        let tab = matched.placeholder_text(ctx.sema, TAB_VAR)?;
+        let key = matched.placeholder_text(ctx.sema, KEY_VAR)?;
+        let default = matched.placeholder_text(ctx.sema, DEFAULT_VAR)?;
         let replacement = format!("ets:lookup_element({tab}, {key}, 2, {default})");
         let range = matched.range.range;
         let mut builder = SourceChangeBuilder::new(matched.range.file_id);

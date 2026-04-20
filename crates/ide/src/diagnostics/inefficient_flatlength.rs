@@ -21,6 +21,7 @@ use lazy_static::lazy_static;
 
 use crate::Assist;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
@@ -56,10 +57,9 @@ impl SsrPatternsLinter for InefficientFlatlengthLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<bool> {
-        if let Some(comments) = matched.comments(sema)
+        if let Some(comments) = matched.comments(ctx.sema)
             && !comments.is_empty()
         {
             return None;
@@ -71,12 +71,11 @@ impl SsrPatternsLinter for InefficientFlatlengthLinter {
         &self,
         _context: &Self::Context,
         matched: &Match,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         let inefficient_call_range = matched.range.range;
-        let nested_list_arg_match_src = matched.placeholder_text(sema, LIST_ARG_VAR)?;
-        let mut builder = SourceChangeBuilder::new(file_id);
+        let nested_list_arg_match_src = matched.placeholder_text(ctx.sema, LIST_ARG_VAR)?;
+        let mut builder = SourceChangeBuilder::new(ctx.file_id);
         let efficient_flatlength = format!("lists:flatlength({nested_list_arg_match_src})");
         builder.replace(inefficient_call_range, efficient_flatlength);
         Some(vec![fix(
