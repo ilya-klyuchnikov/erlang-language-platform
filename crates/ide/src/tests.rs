@@ -55,24 +55,6 @@ pub(crate) fn check_ct_fix(fixture_before: &str, fixture_after: &str) {
 }
 
 #[track_caller]
-pub(crate) fn check_filtered_ct_fix(
-    fixture_before: &str,
-    fixture_after: &str,
-    diagnostic_filter: &dyn Fn(&Diagnostic) -> bool,
-    assist_filter: &dyn Fn(&Assist) -> bool,
-) {
-    let config = DiagnosticsConfig::default().disable(DiagnosticCode::UndefinedFunction);
-    check_filtered_ct_fix_with_config(
-        fixture_before,
-        fixture_after,
-        config,
-        &vec![],
-        diagnostic_filter,
-        assist_filter,
-    );
-}
-
-#[track_caller]
 pub(crate) fn check_filtered_ct_fix_with_config(
     fixture_before: &str,
     fixture_after: &str,

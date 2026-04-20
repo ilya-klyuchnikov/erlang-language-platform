@@ -127,7 +127,7 @@ mod lists_reverse_append;
 mod macro_precedence_suprise;
 mod map_find_to_syntax;
 mod map_insertion_to_syntax;
-mod meck;
+mod meck_missing_no_link_in_init_per_suite;
 mod meck_restricted;
 // @fb-only: mod meta_only;
 mod missing_compile_warn_missing_spec;
@@ -1941,6 +1941,7 @@ const GENERIC_LINTERS: &[&dyn GenericDiagnostics] = &[
     &nonstandard_integer_formatting::LINTER,
     &bad_dialyzer_attribute::LINTER,
     &module_mismatch::LINTER,
+    &meck_missing_no_link_in_init_per_suite::LINTER,
 ];
 
 /// Unified registry for all types of linters
@@ -2727,8 +2728,6 @@ pub fn ct_diagnostics(
 ) -> Vec<Diagnostic> {
     let mut res: Vec<Diagnostic> = Vec::new();
     let sema = Semantic::new(db);
-
-    meck::missing_no_link_in_init_per_suite(&mut res, &sema, file_id);
 
     match &*ct_info(db, file_id) {
         CommonTestInfo::Result { all, groups } => {
