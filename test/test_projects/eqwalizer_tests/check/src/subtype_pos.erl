@@ -169,3 +169,9 @@ app_gen_shape(F) -> F(#{a => {a}, b => {b}}).
 -spec shape_containment() -> {atom(), atom()}.
 shape_containment() ->
     app_gen_shape(fun gen_shape/1).
+
+-spec f1({A}) -> {A, foo}.
+f1({X}) -> {X, foo}.
+
+-spec f1_foo() -> fun(({binary()}) -> {binary(), foo}).
+f1_foo() -> fun f1/1.

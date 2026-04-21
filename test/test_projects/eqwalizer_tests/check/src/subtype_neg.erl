@@ -116,3 +116,9 @@ type_containment_3() -> fun pair_swap/1.
 
 -spec test() -> atom().
 test() -> fun pair_swap/1.
+
+-spec f1({A}) -> {A, foo}.
+f1({X}) -> {X, foo}.
+
+-spec f1_bar() -> fun(({binary()}) -> {binary(), bar}).
+f1_bar() -> fun f1/1.
