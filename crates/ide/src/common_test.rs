@@ -27,8 +27,6 @@
 // This limitation can be solved by leveraging the Erlang Service in ELP to evaluate
 // those functions before processing them.
 
-use std::sync::Arc;
-
 use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::elp_base_db::ModuleName;
 use elp_ide_db::erlang_service::TestDef;
@@ -38,7 +36,6 @@ use elp_syntax::SmolStr;
 use elp_syntax::TextRange;
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
-use hir::DefMap;
 use hir::FunctionDef;
 use hir::Name;
 use hir::NameArity;
@@ -90,32 +87,6 @@ pub fn unreachable_test(
                 res.push(d);
             }
         }
-    }
-}
-
-pub fn ct_info_eval_error(res: &mut Vec<Diagnostic>, sema: &Semantic, file_id: FileId) {
-    let def_map = sema.db.def_map(file_id);
-    eval_error_diagnostic(res, sema, &def_map, &NameArity::new(known::all, 0));
-    eval_error_diagnostic(res, sema, &def_map, &NameArity::new(known::groups, 0));
-}
-
-fn eval_error_diagnostic(
-    res: &mut Vec<Diagnostic>,
-    sema: &Semantic,
-    def_map: &Arc<DefMap>,
-    name: &NameArity,
-) {
-    if let Some(def) = def_map.get_function(name)
-        && let Some(name) = def.first_clause_name(sema.db.upcast())
-    {
-        let range = name.syntax().text_range();
-        let d = Diagnostic::new(
-            DiagnosticCode::CannotEvaluateCTCallbacks,
-            "Could not evaluate function. No code lenses for tests will be available.".to_string(),
-            range,
-        )
-        .with_severity(Severity::Warning);
-        res.push(d);
     }
 }
 
@@ -488,50 +459,6 @@ b(_Config) ->
 c(_Config) ->
   ok.
      "#,
-        );
-    }
-
-    #[test]
-    fn test_cannot_eval_all() {
-        check_ct_diagnostics(
-            r#"
-//- common_test
-//- /my_app/test/cannot_eval_all_SUITE.erl
-   -module(cannot_eval_all_SUITE).~
-   -export([all/0]).
-   -export([a/1, b/1, c/1]).
-   all() -> my_external_helper:all().
-%% ^^^ warning: W0021: Could not evaluate function. No code lenses for tests will be available.
-   a(_Config) ->
-     ok.
-   b(_Config) ->
-     ok.
-   c(_Config) ->
-     ok.
-            "#,
-        );
-    }
-
-    #[test]
-    fn test_cannot_eval_groups() {
-        check_ct_diagnostics(
-            r#"
-//- common_test
-//- /my_app/test/cannot_eval_all_groups_SUITE.erl
-   -module(cannot_eval_all_groups_SUITE).~
-   -export([all/0, groups/0]).
-   -export([a/1, b/1, c/1]).
-   all() -> [a].
-%% ^^^ warning: W0021: Could not evaluate function. No code lenses for tests will be available.
-   groups() -> my_external_helper:groups().
-%% ^^^^^^ warning: W0021: Could not evaluate function. No code lenses for tests will be available.
-   a(_Config) ->
-     ok.
-   b(_Config) ->
-     ok.
-   c(_Config) ->
-     ok.
-            "#,
         );
     }
 

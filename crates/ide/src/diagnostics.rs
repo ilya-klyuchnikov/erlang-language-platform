@@ -99,6 +99,7 @@ mod bad_dialyzer_attribute;
 mod binary_string_to_sigil;
 mod boolean_precedence;
 mod bound_variable;
+mod cannot_evaluate_ct_callbacks;
 mod could_be_a_string_literal;
 mod cross_node_eval;
 mod debugging_function;
@@ -973,7 +974,6 @@ impl<T: SsrPatternsLinter> SsrPatternsDiagnostics for T {
 pub(crate) struct LinterContext<'a> {
     pub sema: &'a Semantic<'a>,
     pub file_id: FileId,
-    #[allow(dead_code)]
     db: &'a RootDatabase,
 }
 
@@ -982,7 +982,6 @@ impl<'a> LinterContext<'a> {
         Self { sema, file_id, db }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn ct_info(&self) -> Arc<CommonTestInfo> {
         ct_info(self.db, self.file_id)
     }
@@ -1945,6 +1944,7 @@ const GENERIC_LINTERS: &[&dyn GenericDiagnostics] = &[
     &bad_dialyzer_attribute::LINTER,
     &module_mismatch::LINTER,
     &meck_missing_no_link_in_init_per_suite::LINTER,
+    &cannot_evaluate_ct_callbacks::LINTER,
 ];
 
 /// Unified registry for all types of linters
@@ -2722,17 +2722,10 @@ pub fn ct_diagnostics(
     let mut res: Vec<Diagnostic> = Vec::new();
     let sema = Semantic::new(db);
 
-    match &*ct_info(db, file_id) {
-        CommonTestInfo::Result { all, groups } => {
-            let testcases = common_test::runnable_names(&sema, file_id, all, groups).ok();
-            common_test::unreachable_test(&mut res, &sema, file_id, &testcases);
-            // @fb-only: meta_only::ct_diagnostics(&mut res, &sema, file_id, testcases);
-        }
-        CommonTestInfo::EvalError(_error) => {
-            // The error currently does not contain anything useful, so we ignore it
-            common_test::ct_info_eval_error(&mut res, &sema, file_id);
-        }
-        _ => (),
+    if let CommonTestInfo::Result { all, groups } = &*ct_info(db, file_id) {
+        let testcases = common_test::runnable_names(&sema, file_id, all, groups).ok();
+        common_test::unreachable_test(&mut res, &sema, file_id, &testcases);
+        // @fb-only: meta_only::ct_diagnostics(&mut res, &sema, file_id, testcases);
     };
     let metadata = db.elp_metadata(file_id);
     res.into_iter()
