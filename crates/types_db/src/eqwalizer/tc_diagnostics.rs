@@ -32,7 +32,6 @@ pub enum TypeError {
     RevealTypeHint(RevealTypeHint),
     RedundantFixme(RedundantFixme),
     RedundantNowarnFunction(RedundantNowarnFunction),
-    AmbiguousUnion(AmbiguousUnion),
     ClauseNotCovered(ClauseNotCovered),
     DynamicLambda(DynamicLambda),
     AmbiguousLambda(AmbiguousLambda),
@@ -143,13 +142,6 @@ pub struct RedundantFixme {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct RedundantNowarnFunction {
     pub pos: eqwalizer::Pos,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct AmbiguousUnion {
-    pub pos: eqwalizer::Pos,
-    pub expected: Type,
-    pub got: Type,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
