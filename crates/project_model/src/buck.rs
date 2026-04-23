@@ -154,6 +154,51 @@ impl BuckConfig {
     pub(crate) fn config_path(&self) -> &AbsPath {
         self.config_path.as_ref().unwrap()
     }
+
+    /// Return the directory containing the `.elp.toml` config file, if known.
+    pub fn config_dir(&self) -> Option<&AbsPath> {
+        self.config_path.as_ref().and_then(|p| p.parent())
+    }
+
+    /// Resolve `included_targets` and `deps_targets` to absolute filesystem
+    /// directories using the cached `BuckCellInfo`.  Deduplicates so that if
+    /// one directory is a subdirectory of another, only the parent is kept
+    /// (since watch globs use `/**/` which already covers subdirectories).
+    pub fn included_target_dirs(&self) -> Vec<AbsPathBuf> {
+        let cell_info = match buck_cell_info() {
+            Ok(info) => info,
+            Err(_) => return vec![],
+        };
+        let mut dirs: Vec<AbsPathBuf> = self
+            .included_targets
+            .iter()
+            .chain(self.deps_targets.iter())
+            .filter_map(|target| {
+                cell_info.make_absolute_maybe(target).and_then(|abs_path| {
+                    let dir = abs_path.trim_end_matches("/...");
+                    let dir = match dir.rfind(':') {
+                        Some(idx) => &dir[..idx],
+                        None => dir,
+                    };
+                    AbsPathBuf::try_from(dir).ok()
+                })
+            })
+            .collect();
+        // Deduplicate: remove dirs that are subdirectories of other dirs,
+        // since watch globs use "/**/BUCK" which already covers subtrees.
+        // Sort shortest-first so parents come before children.
+        dirs.sort_by_key(|a| a.as_str().len());
+        let mut result: Vec<AbsPathBuf> = Vec::new();
+        for dir in dirs {
+            let dominated = result
+                .iter()
+                .any(|existing| dir.starts_with(existing.as_path()));
+            if !dominated {
+                result.push(dir);
+            }
+        }
+        result
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]

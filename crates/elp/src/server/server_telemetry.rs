@@ -14,6 +14,7 @@ use elp_ide::elp_ide_db::elp_base_db::ProjectApps;
 use elp_ide::elp_ide_db::elp_base_db::ProjectId;
 use elp_log::telemetry;
 use elp_project_model::Project;
+use elp_project_model::ProjectBuildData;
 use elp_project_model::buck::BuckQueryConfig;
 use itertools::Itertools;
 
@@ -50,6 +51,20 @@ pub(crate) fn send_project_size(
                 .collect();
 
             let app_count = app_watch_counts.len();
+
+            let (build_watch_dirs, build_type) = match &project.project_build_data {
+                ProjectBuildData::Buck(buck_project) => {
+                    let dirs = buck_project.buck_conf.included_target_dirs();
+                    if dirs.is_empty() {
+                        (vec![project.root().to_string()], "buck_fallback")
+                    } else {
+                        let dir_strs: Vec<String> = dirs.iter().map(|d| d.to_string()).collect();
+                        (dir_strs, "buck_scoped")
+                    }
+                }
+                _ => (vec![project.root().to_string()], "other"),
+            };
+
             let watch_count: usize = app_watch_counts.iter().map(|(_, c)| *c).sum::<usize>()
                 + project_root_watch_paths(&project.root()).len();
 
@@ -64,6 +79,8 @@ pub(crate) fn send_project_size(
                 "root": project.root().to_string(),
                 "app_count": app_count,
                 "watch_count": watch_count,
+                "build_type": build_type,
+                "build_watch_dirs": build_watch_dirs,
                 "top_apps": top_apps,
             }))
         })

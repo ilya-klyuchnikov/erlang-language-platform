@@ -940,9 +940,9 @@ impl Server {
         let file_name = path.file_stem();
         let ext = path.extension();
         let result = match (file_name, ext) {
-            (Some("BUCK"), None) => true,
-            (Some("TARGETS"), None) => true,
-            (Some("TARGETS"), Some("v2")) => true,
+            (Some("BUCK"), None) | (Some("TARGETS"), None) | (Some("TARGETS"), Some("v2")) => {
+                self.is_path_in_project_scope(path)
+            }
             (Some("rebar"), Some("config")) => true,
             (Some("rebar.config"), Some("script")) => true,
             (Some(".elp"), Some("toml")) => true,
@@ -954,6 +954,28 @@ impl Server {
             _ => false,
         };
         result && path_ref.is_file()
+    }
+
+    fn is_path_in_project_scope(&self, path: &AbsPath) -> bool {
+        for project in self.projects.iter() {
+            match &project.project_build_data {
+                ProjectBuildData::Buck(buck_project) => {
+                    let dirs = buck_project.buck_conf.included_target_dirs();
+                    if dirs.is_empty() {
+                        return true; // fallback: accept all
+                    }
+                    for dir in &dirs {
+                        if path.starts_with(dir.as_path()) {
+                            return true;
+                        }
+                    }
+                }
+                _ => {
+                    return true; // non-Buck: accept all
+                }
+            }
+        }
+        false
     }
 
     fn should_reload_config_for_path(&self, path: &AbsPath) -> bool {

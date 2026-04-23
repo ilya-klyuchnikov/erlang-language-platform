@@ -23,6 +23,8 @@ use elp_ide::elp_ide_db::elp_base_db::Vfs;
 use elp_ide::elp_ide_db::elp_base_db::VfsPath;
 use elp_ide::elp_ide_db::elp_base_db::loader;
 use elp_project_model::ProjectAppData;
+use elp_project_model::ProjectBuildData;
+use elp_project_model::buck::BuckProject;
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
 use vfs::AbsPathBuf;
@@ -67,6 +69,29 @@ pub fn project_root_watch_paths(root: &AbsPathBuf) -> Vec<String> {
     ]
 }
 
+fn buck_project_watch_paths(buck_project: &BuckProject) -> Vec<String> {
+    let dirs = buck_project.buck_conf.included_target_dirs();
+    if dirs.is_empty() {
+        let root = buck_project.buck_conf.source_root();
+        return project_root_watch_paths(&root);
+    }
+    let mut paths: Vec<String> = dirs
+        .iter()
+        .flat_map(|dir| {
+            [
+                format!("{}/**/BUCK", dir),
+                format!("{}/**/TARGETS", dir),
+                format!("{}/**/TARGETS.v2", dir),
+            ]
+        })
+        .collect();
+    if let Some(config_dir) = buck_project.buck_conf.config_dir() {
+        paths.push(format!("{}/.elp.toml", config_dir));
+        paths.push(format!("{}/.elp_lint.toml", config_dir));
+    }
+    paths
+}
+
 impl ProjectFolders {
     pub fn new(project_apps: &ProjectApps) -> ProjectFolders {
         let file_set_config = project_apps
@@ -99,8 +124,15 @@ impl ProjectFolders {
             .collect();
 
         for project in &project_apps.projects {
-            let root = project.root();
-            watch_paths.extend(project_root_watch_paths(&root));
+            match &project.project_build_data {
+                ProjectBuildData::Buck(buck_project) => {
+                    watch_paths.extend(buck_project_watch_paths(buck_project));
+                }
+                _ => {
+                    let root = project.root();
+                    watch_paths.extend(project_root_watch_paths(&root));
+                }
+            }
         }
 
         // LSP spec says "If omitted it defaults to
