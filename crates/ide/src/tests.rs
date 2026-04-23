@@ -18,7 +18,6 @@ use elp_ide_db::elp_base_db::FilePosition;
 use elp_ide_db::elp_base_db::FileRange;
 use elp_ide_db::elp_base_db::SourceDatabaseExt;
 use elp_ide_db::elp_base_db::assert_eq_expected;
-use elp_ide_db::elp_base_db::assert_eq_text;
 use elp_ide_db::elp_base_db::fixture::WithFixture;
 use elp_ide_db::elp_base_db::remove_annotations;
 use elp_ide_db::text_edit::TextRange;
@@ -38,60 +37,6 @@ use crate::diagnostics::DiagnosticsTrigger;
 use crate::diagnostics::LabeledDiagnostics;
 use crate::diagnostics::Severity;
 use crate::fixture;
-
-#[track_caller]
-pub(crate) fn check_filtered_ct_fix_with_config(
-    fixture_before: &str,
-    fixture_after: &str,
-    config: DiagnosticsConfig,
-    adhoc_semantic_diagnostics: &Vec<&dyn AdhocSemanticDiagnostics>,
-    diagnostic_filter: &dyn Fn(&Diagnostic) -> bool,
-    assist_filter: &dyn Fn(&Assist) -> bool,
-) {
-    let after = trim_indent(fixture_after);
-    let (analysis, pos, diagnostics_enabled) = fixture::position(fixture_before);
-    diagnostics_enabled.assert_ct_enabled();
-
-    check_no_parse_errors_with_config(&analysis, pos.file_id, &config, adhoc_semantic_diagnostics);
-
-    let diagnostics = fixture::diagnostics_for(
-        &analysis,
-        pos.file_id,
-        &config,
-        adhoc_semantic_diagnostics,
-        &diagnostics_enabled,
-    );
-    let diagnostic = diagnostics
-        .diagnostics_for(pos.file_id)
-        .into_iter()
-        .rfind(diagnostic_filter)
-        .expect("no diagnostics")
-        .clone();
-    let fixes = &diagnostic
-        .fixes
-        .expect("diagnostic misses fixes")
-        .into_iter()
-        .filter(assist_filter)
-        .collect::<Vec<_>>();
-    let fix = fixes.first().expect("filtered fixes are empty");
-    let actual = {
-        let source_change = fix.source_change.as_ref().unwrap();
-        let file_id = *source_change.source_file_edits.keys().next().unwrap();
-        let mut actual = analysis.db.file_text(file_id).to_string();
-
-        for edit in source_change.source_file_edits.values() {
-            edit.apply(&mut actual);
-        }
-        actual
-    };
-    assert!(
-        fix.target.contains_inclusive(pos.offset),
-        "diagnostic fix range {:?} does not touch cursor position {:?}",
-        fix.target,
-        pos.offset
-    );
-    assert_eq_text!(&after, &actual);
-}
 
 /// Takes a multi-file input fixture with annotated cursor positions,
 /// and checks that:
@@ -399,25 +344,6 @@ fn convert_diagnostic_message(d: &Diagnostic) -> String {
         DiagnosticCode::Eqwalizer(_) => d.code.as_code(),
         _ => d.message.clone(),
     }
-}
-
-#[track_caller]
-pub(crate) fn check_ct_diagnostics(elp_fixture: &str) {
-    let (analysis, fixture) = fixture::with_fixture(elp_fixture);
-    fixture.diagnostics_enabled.assert_ct_enabled();
-    let file_id = fixture.file_id();
-    let config = DiagnosticsConfig::default();
-    let diagnostics = fixture::diagnostics_for(
-        &analysis,
-        file_id,
-        &config,
-        &vec![],
-        &fixture.diagnostics_enabled,
-    );
-    let diagnostics = diagnostics.diagnostics_for(file_id);
-    let expected = fixture.annotations_by_file_id(&file_id);
-    let actual = convert_diagnostics_to_annotations(diagnostics);
-    assert_eq_expected!(expected, actual);
 }
 
 #[track_caller]
