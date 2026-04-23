@@ -103,7 +103,8 @@ fn serialization_test() {
     let mut module_index = FxHashMap::default();
     module_index.insert(file_id.into(), module_name.to_string());
 
-    write_results(map, module_index, &mut cli, &args).expect("success");
+    let app_index = FxHashMap::default();
+    write_results(map, module_index, app_index, &mut cli, &args).expect("success");
     let (out, err) = cli.to_strings();
     let expected = resource_file!("glean/serialization_test.out");
     assert_eq!(expected.data().trim(), &out);
@@ -658,7 +659,11 @@ fn facts_with_annotations_with_config(
         analysis: host.analysis(),
         module: None,
     };
-    let (facts, module_index, _errored_paths) = glean.index(config).expect("success");
+    let IndexResult {
+        facts,
+        module_index,
+        ..
+    } = glean.index(config).expect("success");
     let facts = facts.into_values().next().unwrap();
     let mut expected_by_file: HashMap<GleanFileId, _> = HashMap::new();
     let mut file_names = HashMap::new();

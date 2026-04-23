@@ -571,7 +571,6 @@ pub struct Glean {
     /// Produce glean db with macros, types, xrefs. Incompatible with previous
     pub v2: bool,
     /// Emit erlang.2 schema glean facts
-    #[allow(dead_code)] // Used in follow-up diffs (dual-write)
     pub schema2: bool,
     /// Pretty print
     pub pretty: bool,

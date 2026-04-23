@@ -112,15 +112,16 @@ use types::XRef;
 use types::XRefFile;
 use types::XRefTarget;
 
-type IndexResult = (
-    FxHashMap<String, IndexedFacts>,
-    FxHashMap<GleanFileId, String>,
-    Vec<String>,
-);
-
 #[derive(Clone, Debug, Default)]
 struct IndexConfig {
     pub multi: bool,
+}
+
+struct IndexResult {
+    facts: FxHashMap<String, IndexedFacts>,
+    module_index: FxHashMap<GleanFileId, String>,
+    app_index: FxHashMap<GleanFileId, String>,
+    errored_paths: Vec<String>,
 }
 
 pub struct GleanIndexer {
@@ -189,9 +190,14 @@ fn index_inner(
 ) -> Result<(IndexerMetrics, Vec<String>)> {
     let (indexer, _loaded) = GleanIndexer::new(args, cli, query_config, ifdef)?;
     let config = IndexConfig { multi: args.multi };
-    let (facts, module_index, errored_paths) = indexer.index(config)?;
+    let IndexResult {
+        facts,
+        module_index,
+        app_index,
+        errored_paths,
+    } = indexer.index(config)?;
     let mut metrics = IndexerMetrics::from_facts(&facts, errored_paths.len());
-    metrics.output_bytes = write_results(facts, module_index, cli, args)?;
+    metrics.output_bytes = write_results(facts, module_index, app_index, cli, args)?;
     Ok((metrics, errored_paths))
 }
 
@@ -199,6 +205,7 @@ fn index_inner(
 fn write_results(
     facts: FxHashMap<String, IndexedFacts>,
     module_index: FxHashMap<GleanFileId, String>,
+    app_index: FxHashMap<GleanFileId, String>,
     cli: &mut dyn Cli,
     args: &Glean,
 ) -> Result<u64> {
@@ -207,7 +214,14 @@ fn write_results(
     }
     let mut total_bytes: u64 = 0;
     for (name, fact) in facts {
-        let fact = fact.into_glean_facts(&module_index);
+        let fact = if args.schema2 {
+            // Dual-write: produce both erlang.1 and erlang.2 facts
+            let mut all_facts = fact.clone().into_glean_facts(&module_index);
+            all_facts.extend(fact.into_schema2_facts(&module_index, &app_index));
+            all_facts
+        } else {
+            fact.into_glean_facts(&module_index)
+        };
         let content = if args.pretty {
             serde_json::to_string_pretty(&fact)?
         } else {
@@ -258,7 +272,6 @@ impl GleanIndexer {
         Ok((indexer, loaded))
     }
 
-    /// Returns (facts, module_index, errored_file_paths).
     fn index(&self, config: IndexConfig) -> Result<IndexResult> {
         let ctx = self.analysis.with_db(|db| {
             let project_id = self.project_id;
@@ -270,6 +283,21 @@ impl GleanIndexer {
                     path_to_module_name(path).map(|name| ((*file_id).into(), name))
                 })
                 .collect();
+            // app index: file_id → OTP application name (for erlang.2 schema)
+            let app_index: FxHashMap<GleanFileId, String> = {
+                let project_data = db.project_data(project_id);
+                let mut index = FxHashMap::default();
+                for &source_root_id in &project_data.source_roots {
+                    if let Some(app_data) = db.app_data(source_root_id) {
+                        let app_name = app_data.name.as_str().to_string();
+                        let source_root = db.source_root(source_root_id);
+                        for file_id in source_root.iter() {
+                            index.insert(file_id.into(), app_name.clone());
+                        }
+                    }
+                }
+                index
+            };
             let (facts, errored) = if let Some(module) = &self.module {
                 let index = db.module_index(self.project_id);
                 let file_id = index
@@ -340,7 +368,12 @@ impl GleanIndexer {
                 };
                 (facts, errored.into_inner().expect("errored mutex poisoned"))
             };
-            (facts, module_index, errored)
+            IndexResult {
+                facts,
+                module_index,
+                app_index,
+                errored_paths: errored,
+            }
         })?;
         Ok(ctx)
     }

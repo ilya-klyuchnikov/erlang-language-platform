@@ -27,7 +27,7 @@ impl From<FileId> for GleanFileId {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct FileFact {
     #[serde(rename = "id")]
     pub(crate) file_id: GleanFileId,
@@ -44,7 +44,7 @@ impl FileFact {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct FileLinesFact {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
@@ -66,7 +66,7 @@ impl FileLinesFact {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct ModuleFact {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
@@ -105,7 +105,7 @@ impl ModuleFact {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct FunctionDeclarationFact {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
@@ -113,14 +113,14 @@ pub(crate) struct FunctionDeclarationFact {
     pub(crate) span: Location,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct XRefFact {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
     pub(crate) xrefs: Vec<XRefFactVal>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct XRefFactVal {
     pub(crate) source: Location,
     pub(crate) target: MFA,
@@ -230,20 +230,20 @@ pub(crate) enum Fact {
     DeclComment2 { facts: Vec<Key<Schema2CommentFact>> },
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct XRefFile {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
     pub(crate) xrefs: Vec<XRef>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct XRef {
     pub(crate) source: Location,
     pub(crate) target: XRefTarget,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) enum XRefTarget {
     #[serde(rename = "func")]
     Function(Key<FunctionTarget>),
@@ -272,7 +272,7 @@ impl XRefTarget {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct FunctionTarget {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
@@ -280,14 +280,14 @@ pub(crate) struct FunctionTarget {
     pub(crate) arity: u32,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct TaggedUrl {
     pub tag: String,
     pub display_name: String,
     pub url: String,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct MacroTarget {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
@@ -300,14 +300,14 @@ pub(crate) struct MacroTarget {
     pub(crate) tagged_urls: Vec<TaggedUrl>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct HeaderTarget {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
     pub(crate) name: String,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct RecordTarget {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
@@ -316,7 +316,7 @@ pub(crate) struct RecordTarget {
     pub(crate) tagged_urls: Vec<TaggedUrl>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct TypeTarget {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
@@ -324,14 +324,14 @@ pub(crate) struct TypeTarget {
     pub(crate) arity: u32,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct VarTarget {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
     pub(crate) name: String,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct FileDeclaration {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
@@ -349,7 +349,7 @@ impl<T> From<T> for Key<T> {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct CommentFact {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
