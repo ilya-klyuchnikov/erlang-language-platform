@@ -64,7 +64,6 @@ pub struct DefMap {
     pub function_clauses: FxHashMap<FunctionClauseId, FunctionClauseDef>,
     functions: FxHashMap<InFile<FunctionDefId>, FunctionDef>,
 
-    function_clauses_by_fa: FxHashMap<NameArity, FunctionClauseId>,
     functions_by_fa: FxHashMap<NameArity, InFile<FunctionDefId>>,
     function_by_function_id: FxHashMap<FunctionClauseId, FunctionDefId>,
 
@@ -199,7 +198,6 @@ impl DefMap {
             match form {
                 FormIdx::FunctionClause(idx) => {
                     let function_clause = form_list[idx].clone();
-                    let fun_name = &function_clause.name.clone();
                     let function_def = FunctionClauseDef {
                         file,
                         module: module.clone(),
@@ -209,10 +207,6 @@ impl DefMap {
                         doc_metadata_id: last_doc_metadata_attribute,
                     };
                     def_map.function_clauses.insert(idx, function_def);
-                    let function_clause_id = idx;
-                    def_map
-                        .function_clauses_by_fa
-                        .insert(fun_name.clone(), function_clause_id);
                     last_doc_attribute = None;
                     last_doc_metadata_attribute = None;
                 }
@@ -700,12 +694,6 @@ impl DefMap {
                 .iter()
                 .map(|(name, def)| (*name, def.clone())),
         );
-        self.function_clauses_by_fa.extend(
-            other
-                .function_clauses_by_fa
-                .iter()
-                .map(|(name, def)| (name.clone(), *def)),
-        );
         self.functions_by_fa.extend(
             other
                 .functions_by_fa
@@ -971,7 +959,6 @@ impl DefMap {
             parse_transform: _,
             optional_callbacks,
             function_by_function_id: function_by_form_id,
-            function_clauses_by_fa,
             functions_by_fa,
             behaviours,
             moduledoc,
@@ -994,7 +981,6 @@ impl DefMap {
         macros.shrink_to_fit();
         deprecated.shrink_to_fit();
         function_by_form_id.shrink_to_fit();
-        function_clauses_by_fa.shrink_to_fit();
         functions_by_fa.shrink_to_fit();
         behaviours.shrink_to_fit();
         moduledoc.shrink_to_fit();
