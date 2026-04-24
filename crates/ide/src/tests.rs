@@ -90,20 +90,6 @@ pub enum IncludeCodeActionAssists {
 }
 
 #[track_caller]
-#[allow(unused)]
-pub(crate) fn check_fix_including_assists(fixture_before: &str, fixture_after: Expect) {
-    let config = DiagnosticsConfig::default().set_experimental(true);
-    check_nth_fix(
-        0,
-        fixture_before,
-        fixture_after,
-        config,
-        &vec![],
-        IncludeCodeActionAssists::Yes,
-    )
-}
-
-#[track_caller]
 pub(crate) fn check_nth_fix(
     nth: usize,
     fixture_before: &str,
