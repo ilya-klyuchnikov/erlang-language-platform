@@ -13,6 +13,8 @@
 // Diagnostic for unsafe usages of an applications environment.
 // The originial motivation and discussion is in T107133234
 
+use std::borrow::Cow;
+
 use elp_ide_db::elp_base_db::FileId;
 use hir::AnyExprId;
 use hir::ExprId;
@@ -21,34 +23,102 @@ use hir::InFunctionClauseBody;
 use hir::Semantic;
 use lazy_static::lazy_static;
 
-use super::Diagnostic;
-use super::DiagnosticConditions;
-use super::DiagnosticDescriptor;
+use crate::FunctionMatch;
 use crate::codemod_helpers::CheckCallCtx;
-use crate::codemod_helpers::FunctionMatch;
-use crate::codemod_helpers::MatchCtx;
-use crate::codemod_helpers::find_call_in_function;
 // @fb-only: use crate::diagnostics;
 use crate::diagnostics::DiagnosticCode;
+use crate::diagnostics::FunctionCallLinter;
+use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
 
-pub(crate) static DESCRIPTOR: DiagnosticDescriptor = DiagnosticDescriptor {
-    conditions: DiagnosticConditions {
-        experimental: false,
-        include_generated: true,
-        include_tests: false,
-        default_disabled: false,
-    },
-    checker: &|diags, sema, file_id, _ext| {
-        application_env(diags, sema, file_id);
-    },
-};
+pub(crate) struct ApplicationEnvLinter;
 
-fn application_env(diags: &mut Vec<Diagnostic>, sema: &Semantic, file_id: FileId) {
-    sema.def_map(file_id)
-        .get_functions()
-        .for_each(|(_, def)| check_function(diags, sema, def));
+impl Linter for ApplicationEnvLinter {
+    fn id(&self) -> DiagnosticCode {
+        DiagnosticCode::ApplicationGetEnv
+    }
+
+    fn description(&self) -> &'static str {
+        "Unsafe usage of an application's environment"
+    }
+
+    fn severity(&self, _sema: &Semantic, _file_id: FileId) -> Severity {
+        Severity::Warning
+    }
+
+    fn should_process_generated_files(&self) -> bool {
+        true
+    }
+
+    fn should_process_test_files(&self) -> bool {
+        false
+    }
 }
+
+impl FunctionCallLinter for ApplicationEnvLinter {
+    type Context = String;
+
+    fn match_description(&self, context: &Self::Context) -> Cow<'_, str> {
+        Cow::Owned(context.clone())
+    }
+
+    fn matches_functions(&self) -> Vec<FunctionMatch> {
+        all_function_matches()
+    }
+
+    fn check_match(&self, context: &CheckCallCtx<'_, ()>) -> Option<Self::Context> {
+        let action = find_action(context.mfa)?;
+        let def = context.in_clause.value;
+        match &action {
+            BadEnvCallAction::AppArg(arg_index) => {
+                let arg = context.args.get(*arg_index)?;
+                check_valid_application(context.sema, context.in_clause, &arg, def)
+            }
+            BadEnvCallAction::OptionsArg { arg_index, tag } => {
+                let arg = context.args.get(*arg_index)?;
+                match &context.in_clause[arg] {
+                    hir::Expr::List { exprs, tail: _ } => {
+                        exprs
+                            .iter()
+                            .find_map(|expr| match &context.in_clause[*expr] {
+                                hir::Expr::Tuple { exprs } => {
+                                    let key = exprs.first()?;
+                                    let val = exprs.get(1)?;
+                                    let key_name = context.in_clause.as_atom_name(key)?;
+                                    if tag == key_name.as_str() {
+                                        check_tuple(context.in_clause, val, context.sema, def)
+                                    } else {
+                                        None
+                                    }
+                                }
+                                _ => None,
+                            })
+                    }
+                    _ => None,
+                }
+            }
+            BadEnvCallAction::MapArg { arg_index, keys } => {
+                let arg = context.args.get(*arg_index)?;
+                match &context.in_clause[arg] {
+                    hir::Expr::Map { fields: _ } => {
+                        if let Some(AnyExprId::Expr(rhs)) = context
+                            .in_clause
+                            .body()
+                            .lookup_map_path(AnyExprId::Expr(arg), keys)
+                        {
+                            check_tuple(context.in_clause, &rhs, context.sema, def)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                }
+            }
+        }
+    }
+}
+
+pub static LINTER: ApplicationEnvLinter = ApplicationEnvLinter;
 
 #[derive(Debug, Clone)]
 pub struct BadEnvCall {
@@ -99,110 +169,30 @@ pub(crate) enum BadEnvCallAction {
     },
 }
 
-fn check_function(diags: &mut Vec<Diagnostic>, sema: &Semantic, def: &FunctionDef) {
-    lazy_static! {
-        static ref BAD_MATCHES: Vec<BadEnvCall> = vec![
-            BadEnvCall::new(
-                "application",
-                "get_env",
-                vec![2, 3],
-                BadEnvCallAction::AppArg(0),
-            ),
-            // @fb-only: diagnostics::meta_only::application_env_bad_matches(),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>();
-
-        static ref BAD_MATCH_MFAS: Vec<(&'static FunctionMatch, &'static BadEnvCallAction)> =
-            BAD_MATCHES
-                .iter()
-                .map(|b| (&b.mfa, &b.action))
-                .collect::<Vec<_>>();
-    }
-
-    process_badmatches(diags, sema, def, &BAD_MATCH_MFAS);
+lazy_static! {
+    static ref BAD_MATCHES: Vec<BadEnvCall> = vec![
+        BadEnvCall::new(
+            "application",
+            "get_env",
+            vec![2, 3],
+            BadEnvCallAction::AppArg(0),
+        ),
+        // @fb-only: diagnostics::meta_only::application_env_bad_matches(),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
 }
 
-fn process_badmatches(
-    diags: &mut Vec<Diagnostic>,
-    sema: &Semantic,
-    def: &FunctionDef,
-    mfas: &[(&FunctionMatch, &BadEnvCallAction)],
-) {
-    find_call_in_function(
-        diags,
-        sema,
-        def,
-        mfas,
-        &[],
-        &move |CheckCallCtx {
-                   t, args, in_clause, ..
-               }: CheckCallCtx<'_, &BadEnvCallAction>| match t {
-            BadEnvCallAction::AppArg(arg_index) => {
-                let arg = args.get(*arg_index)?;
-                check_valid_application(sema, in_clause, &arg, def)
-            }
-            BadEnvCallAction::OptionsArg { arg_index, tag } => {
-                let arg = args.get(*arg_index)?;
-                match &in_clause[arg] {
-                    hir::Expr::List { exprs, tail: _ } => {
-                        exprs.iter().find_map(|expr| match &in_clause[*expr] {
-                            hir::Expr::Tuple { exprs } => {
-                                let key = exprs.first()?;
-                                let val = exprs.get(1)?;
-                                let key_name = in_clause.as_atom_name(key)?;
-                                if tag == key_name.as_str() {
-                                    check_tuple(in_clause, val, sema, def)
-                                } else {
-                                    None
-                                }
-                            }
-                            _ => None,
-                        })
-                    }
-                    _ => None,
-                }
-            }
-            BadEnvCallAction::MapArg { arg_index, keys } => {
-                // We expect the `arg_index`'th argument to contain a
-                // map.  We chase through the keys, expecting each to
-                // return another map, which we look up the next key
-                // in. At the end we expect a tuple, and check the
-                // first arg of that.
-                let arg = args.get(*arg_index)?;
-                match &in_clause[arg] {
-                    hir::Expr::Map { fields: _ } => {
-                        if let Some(AnyExprId::Expr(rhs)) =
-                            in_clause.body().lookup_map_path(AnyExprId::Expr(arg), keys)
-                        {
-                            check_tuple(in_clause, &rhs, sema, def)
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
-                }
-            }
-        },
-        &move |MatchCtx {
-                   sema,
-                   def_fb,
-                   extra,
-                   range,
-                   ..
-               }: MatchCtx<'_, String>|
-              -> Option<Diagnostic> {
-            if range.file_id == def.file.file_id {
-                let diag = Diagnostic::new(DiagnosticCode::ApplicationGetEnv, extra, range.range)
-                    .with_severity(Severity::Warning)
-                    .with_ignore_fix(sema, def_fb.file_id());
-                Some(diag)
-            } else {
-                None
-            }
-        },
-    );
+fn all_function_matches() -> Vec<FunctionMatch> {
+    BAD_MATCHES.iter().map(|b| b.mfa.clone()).collect()
+}
+
+fn find_action(mfa: &FunctionMatch) -> Option<&'static BadEnvCallAction> {
+    BAD_MATCHES
+        .iter()
+        .find(|b| &b.mfa == mfa)
+        .map(|b| &b.action)
 }
 
 fn check_tuple(
@@ -263,11 +253,11 @@ mod tests {
 
             get_mine() ->
                 application:get_env(misc, key).
-            %%  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 warning: W0011: module `main` belongs to app `my_app`, but reads env for `misc`
+            %%  ^^^^^^^^^^^^^^^^^^^ 💡 warning: W0011: module `main` belongs to app `my_app`, but reads env for `misc`
 
             get_mine3() ->
                 application:get_env(misc, key, def).
-            %%  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 warning: W0011: module `main` belongs to app `my_app`, but reads env for `misc`
+            %%  ^^^^^^^^^^^^^^^^^^^ 💡 warning: W0011: module `main` belongs to app `my_app`, but reads env for `misc`
 
             //- /my_app/src/application.erl
             -module(application).
@@ -300,7 +290,7 @@ mod tests {
 
             steal() ->
                 application:get_env(debug, key).
-            %%  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 warning: W0011: module `app_env` belongs to app `misc`, but reads env for `debug`
+            %%  ^^^^^^^^^^^^^^^^^^^ 💡 warning: W0011: module `app_env` belongs to app `misc`, but reads env for `debug`
 
             //- /misc/src/application.erl app:misc
             -module(application).

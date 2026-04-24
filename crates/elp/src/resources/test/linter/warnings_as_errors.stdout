@@ -5,7 +5,7 @@ app_a/src/app_a.erl:12:1-12:4::[Error] [L1230] function bar/0 is unused
 app_a/src/app_a.erl:13:5-13:14::[Warning] [W0026] Function 'app_a:baz/2' is not exported.
 app_a/src/app_a.erl:16:1-16:4::[Error] [L1230] function baz/2 is unused
 app_a/src/app_a.erl:20:1-20:4::[Error] [L1230] function bat/2 is unused
-app_a/src/app_a.erl:5:5-5:35::[Warning] [W0011] module `app_a` belongs to app `app_a`, but reads env for `misc`
+app_a/src/app_a.erl:5:5-5:24::[Warning] [W0011] module `app_a` belongs to app `app_a`, but reads env for `misc`
 app_a/src/app_a.erl:8:7-8:8::[Warning] [W0018] Unexpected ';'
 app_a/src/app_a.erl:9:1-9:5::[Error] [P1700] head mismatch 'fooX' vs 'food'
 app_a/src/app_a_ssr.erl:7:6-7:7::[Warning] [W0060] Match on a bound variable
@@ -23,5 +23,5 @@ app_a/test/app_a_test_helpers_not_opted_in.erl:2:23-2:40::[Warning] [W0054] Do n
 app_a/test/app_a_unreachable_test_SUITE.erl:8:1-8:2::[Error] [W0008] Unreachable test (b/1)
 app_a/test/app_test_helpers_no_errors.erl:1:9-1:37::[Error] [W0001] Module name (app_a_test_helpers_no_errors) does not match file name (app_test_helpers_no_errors)
 app_a/test/app_test_helpers_no_errors.erl:2:23-2:40::[Warning] [W0054] Do not suppress compiler warnings at module level.
-app_b/src/app_b.erl:5:5-5:35::[Warning] [W0011] module `app_b` belongs to app `app_b`, but reads env for `misc`
+app_b/src/app_b.erl:5:5-5:24::[Warning] [W0011] module `app_b` belongs to app `app_b`, but reads env for `misc`
 app_b/src/app_b_unused_param.erl:5:5-5:6::[Error] [L1268] variable 'X' is unused

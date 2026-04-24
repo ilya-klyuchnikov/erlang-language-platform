@@ -1855,10 +1855,7 @@ pub fn native_diagnostics(
 }
 
 pub fn diagnostics_descriptors<'a>() -> Vec<&'a DiagnosticDescriptor<'a>> {
-    vec![
-        &application_env::DESCRIPTOR,
-        &deprecated_function::DESCRIPTOR,
-    ]
+    vec![&deprecated_function::DESCRIPTOR]
 }
 
 pub fn diagnostics_from_descriptors(
@@ -1946,6 +1943,7 @@ impl DiagnosticLinter {
 
 /// Function call linters that detect issues in function calls
 const FUNCTION_CALL_LINTERS: &[&dyn FunctionCallDiagnostics] = &[
+    &application_env::LINTER,
     &sets_version_2::LINTER,
     &no_garbage_collect::LINTER,
     &no_size::LINTER,
