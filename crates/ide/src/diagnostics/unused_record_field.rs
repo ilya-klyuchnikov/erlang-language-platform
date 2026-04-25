@@ -17,6 +17,7 @@ use std::borrow::Cow;
 use elp_ide_assists::Assist;
 use elp_ide_db::SymbolDefinition;
 use elp_ide_db::elp_base_db::FileId;
+use elp_ide_db::elp_base_db::FileKind;
 use elp_ide_db::elp_base_db::FileRange;
 use elp_ide_db::source_change::SourceChange;
 use elp_ide_db::text_edit::TextEdit;
@@ -42,11 +43,8 @@ impl Linter for UnusedRecordFieldLinter {
     fn description(&self) -> &'static str {
         "Unused record field."
     }
-    fn should_process_generated_files(&self) -> bool {
-        true
-    }
     fn should_process_file_id(&self, sema: &Semantic, file_id: FileId) -> bool {
-        sema.db.file_kind(file_id).is_module()
+        sema.db.file_kind(file_id) == FileKind::SrcModule
     }
 }
 
@@ -212,6 +210,37 @@ main(#used_field{field_a = A} = X) ->
             r#"
 //- /include/foo.hrl
 -record(unused_record, {field_a, field_b}).
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_unused_record_field_not_applicable_for_suite() {
+        check_diagnostics(
+            r#"
+//- /my_app/test/my_SUITE.erl extra:test
+-module(my_SUITE).
+-export([test/1]).
+-record(my_rec, {field_a, field_b}).
+test(_Config) ->
+    R = #my_rec{field_a = 1},
+    R#my_rec.field_a.
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_unused_record_field_applicable_for_test_helper() {
+        check_diagnostics(
+            r#"
+//- /my_app/test/my_test_helper.erl extra:test
+-module(my_test_helper).
+-export([make/0]).
+-record(my_rec, {field_a, field_b}).
+                       %% ^^^^^^^ 💡 warning: W0003: Unused record field (my_rec.field_b)
+make() ->
+    R = #my_rec{field_a = 1},
+    R#my_rec.field_a.
             "#,
         );
     }
