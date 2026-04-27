@@ -334,10 +334,18 @@ impl IndexedFacts {
         let mut comments: Vec<Key<Schema2CommentFact>> = vec![];
         let mut file_decls_list: Vec<Key<Schema2FileDeclarations>> = vec![];
 
+        let on_load_by_file: FxHashMap<GleanFileId, Vec<String>> = self
+            .module_facts
+            .iter()
+            .filter(|mf| !mf.on_load_fns.is_empty())
+            .map(|mf| (mf.file_id.clone(), mf.on_load_fns.clone()))
+            .collect();
+
         let file_declarations = mem::take(&mut self.file_declarations);
         for file_decl in file_declarations {
             let module = modules.get(&file_decl.file_id).unwrap_or(&unknown);
             let app = apps.get(&file_decl.file_id).unwrap_or(&unknown);
+            let module_on_load_fns = on_load_by_file.get(&file_decl.file_id);
             let mut file_schema2_decls: Vec<Schema2Declaration> = vec![];
 
             for d in file_decl.declarations {
@@ -360,6 +368,8 @@ impl IndexedFacts {
                             }
                             .into(),
                         );
+                        let is_on_load =
+                            module_on_load_fns.is_some_and(|fns| fns.contains(&f.key.name));
                         func_defs.push(
                             Schema2FuncDef {
                                 declaration: decl.clone().into(),
@@ -369,7 +379,7 @@ impl IndexedFacts {
                                 } else {
                                     None
                                 },
-                                is_on_load: false,
+                                is_on_load,
                                 is_nif: false,
                                 spec_text: None,
                             }
@@ -688,7 +698,7 @@ impl IndexedFacts {
                     exports,
                     behaviours: mf.behaviours.unwrap_or_default(),
                     exdoc_link: mf.exdoc_link,
-                    compile_options: vec![],
+                    compile_options: mf.compile_options,
                 }
                 .into(),
             );

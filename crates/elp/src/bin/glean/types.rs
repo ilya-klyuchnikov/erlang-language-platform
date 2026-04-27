@@ -83,6 +83,10 @@ pub(crate) struct ModuleFact {
     pub(crate) exdoc_link: Option<String>,
     #[serde(skip)]
     pub(crate) callbacks: Vec<CallbackInfo>,
+    #[serde(skip)]
+    pub(crate) compile_options: Vec<String>,
+    #[serde(skip)]
+    pub(crate) on_load_fns: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

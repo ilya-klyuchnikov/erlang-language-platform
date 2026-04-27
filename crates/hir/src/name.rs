@@ -307,9 +307,10 @@ pub mod known {
         // Attribute names
         author,
         compile,
-        oncall,
-        moduledoc,
         doc,
+        moduledoc,
+        on_load,
+        oncall,
         // Dialyzer options
         error_handling,
         extra_return,

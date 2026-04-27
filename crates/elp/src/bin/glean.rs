@@ -474,6 +474,34 @@ impl GleanIndexer {
             })
             .collect();
 
+        let source = db.parse(file_id);
+        let compile_options: Vec<String> = form_list
+            .compile_attributes()
+            .flat_map(|(_, opt)| {
+                let ast_opt = opt.form_id.get(&source.tree());
+                ast_opt.options().into_iter().flat_map(|options| {
+                    options
+                        .syntax()
+                        .descendants()
+                        .filter_map(|n| ast::Atom::cast(n).map(|a| a.as_name().to_string()))
+                })
+            })
+            .collect();
+
+        let on_load_fns: Vec<String> = form_list
+            .attributes()
+            .filter(|(_, attr)| attr.name == hir::known::on_load)
+            .flat_map(|(_, attr)| {
+                let attr_ast = attr.form_id.get(&source.tree());
+                attr_ast.value().into_iter().flat_map(|value| {
+                    value
+                        .syntax()
+                        .descendants()
+                        .filter_map(|n| ast::Atom::cast(n).map(|a| a.as_name().to_string()))
+                })
+            })
+            .collect();
+
         ModuleFact {
             file_id: file_id.into(),
             name,
@@ -483,6 +511,8 @@ impl GleanIndexer {
             module_doc,
             exdoc_link,
             callbacks,
+            compile_options,
+            on_load_fns,
         }
     }
 
