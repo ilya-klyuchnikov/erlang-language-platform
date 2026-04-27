@@ -1810,14 +1810,6 @@ pub fn native_diagnostics(
             .lints_from_config
             .get_diagnostics(&mut res, &sema, file_id);
         // @fb-only: meta_only::diagnostics(&mut res, &sema, file_id, file_kind, config);
-        diagnostics_from_descriptors(
-            &mut res,
-            &sema,
-            file_id,
-            file_kind,
-            config,
-            &diagnostics_descriptors(),
-        );
         let linter_ctx = LinterContext::new(&sema, file_id, db);
         diagnostics_from_linters(&mut res, &linter_ctx, config, trigger, linters());
 
@@ -1855,10 +1847,6 @@ pub fn native_diagnostics(
         labeled_syntax_errors,
         labeled_undefined_errors: FxHashMap::default(),
     }
-}
-
-pub fn diagnostics_descriptors<'a>() -> Vec<&'a DiagnosticDescriptor<'a>> {
-    vec![]
 }
 
 pub fn diagnostics_from_descriptors(
