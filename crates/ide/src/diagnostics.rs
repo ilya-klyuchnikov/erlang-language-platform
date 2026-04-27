@@ -341,6 +341,7 @@ impl Diagnostic {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn with_ignore_fix(self, sema: &Semantic, file_id: FileId) -> Diagnostic {
         self.with_suppression_fix(
             sema,
@@ -386,6 +387,7 @@ impl Diagnostic {
         self
     }
 
+    #[cfg(test)]
     #[allow(clippy::too_many_arguments)]
     fn with_suppression_fix(
         mut self,
@@ -2448,47 +2450,6 @@ pub(crate) fn make_missing_diagnostic(
 ) -> Diagnostic {
     let message = format!("Missing '{item}'");
     Diagnostic::new(DiagnosticCode::Missing(code), message, range).with_severity(Severity::Warning)
-}
-
-/// Deduplicate diagnostics by line start and add ignore fix only to the first diagnostic on each line.
-/// This prevents duplicate ignore fix suggestions when multiple diagnostics occur on the same line.
-pub(crate) fn add_ignore_fix_deduplicated(
-    diagnostics: &mut Vec<Diagnostic>,
-    temp_diagnostics: Vec<Diagnostic>,
-    sema: &Semantic,
-    file_id: FileId,
-) {
-    let parsed = sema.parse(file_id);
-    let mut diagnostics_by_line_start: FxHashMap<u32, Vec<Diagnostic>> = FxHashMap::default();
-
-    for diagnostic in temp_diagnostics {
-        let line_start_offset = if let Some(token) = parsed
-            .value
-            .syntax()
-            .token_at_offset(diagnostic.range.start())
-            .right_biased()
-        {
-            start_of_line(&token).into()
-        } else {
-            diagnostic.range.start().into()
-        };
-
-        diagnostics_by_line_start
-            .entry(line_start_offset)
-            .or_default()
-            .push(diagnostic);
-    }
-
-    for (_, mut diags_on_line) in diagnostics_by_line_start {
-        if let Some(first_diag) = diags_on_line.first_mut() {
-            *first_diag = std::mem::replace(
-                first_diag,
-                Diagnostic::new(DiagnosticCode::default(), "", TextRange::default()),
-            )
-            .with_ignore_fix(sema, file_id);
-        }
-        diagnostics.extend(diags_on_line);
-    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
