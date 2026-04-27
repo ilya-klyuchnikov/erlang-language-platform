@@ -1186,12 +1186,6 @@ impl DiagnosticConditions {
     }
 }
 
-#[derive(Clone)]
-pub struct DiagnosticDescriptor<'a> {
-    conditions: DiagnosticConditions,
-    checker: &'a dyn AdhocSemanticDiagnostics,
-}
-
 // ---------------------------------------------------------------------
 
 #[derive(Default, Clone, Debug)]
@@ -1811,7 +1805,6 @@ pub fn native_diagnostics(
         config
             .lints_from_config
             .get_diagnostics(&mut res, &sema, file_id);
-        // @fb-only: meta_only::diagnostics(&mut res, &sema, file_id, file_kind, config);
         let linter_ctx = LinterContext::new(&sema, file_id, db);
         diagnostics_from_linters(&mut res, &linter_ctx, config, trigger, linters());
 
@@ -1849,72 +1842,6 @@ pub fn native_diagnostics(
         labeled_syntax_errors,
         labeled_undefined_errors: FxHashMap::default(),
     }
-}
-
-pub fn diagnostics_from_descriptors(
-    res: &mut Vec<Diagnostic>,
-    sema: &Semantic,
-    file_id: FileId,
-    file_kind: FileKind,
-    config: &DiagnosticsConfig,
-    descriptors: &[&DiagnosticDescriptor],
-) {
-    let generated_status = sema.db.generated_status(file_id);
-    let is_test = sema
-        .db
-        .is_test_suite_or_test_helper(file_id)
-        .unwrap_or(false);
-    let app_name = sema.db.file_app_name(file_id);
-
-    // For partially-generated files, always get the manual section ranges
-    // (we need them to strip fixes from generated sections even when include_generated is true)
-    let manual_ranges = if generated_status.is_partially_generated() {
-        Some(sema.db.manual_section_ranges(file_id))
-    } else {
-        None
-    };
-
-    descriptors.iter().for_each(|descriptor| {
-        // For partially-generated files, always run the linter (we'll filter results later)
-        let should_run = if generated_status.is_partially_generated() {
-            descriptor.conditions.enabled(config, false, is_test)
-        } else {
-            descriptor
-                .conditions
-                .enabled(config, generated_status.is_generated(), is_test)
-        };
-
-        if should_run {
-            let mut diags: Vec<Diagnostic> = Vec::default();
-            (descriptor.checker)(&mut diags, sema, file_id, file_kind);
-            for mut diag in diags {
-                // Check if this diagnostic is enabled (for default_disabled descriptors)
-                // and if the app is not excluded for this diagnostic code
-                let is_enabled =
-                    !descriptor.conditions.default_disabled || config.enabled.contains(&diag.code);
-                let app_allowed = should_process_app(&app_name, config, &diag.code);
-
-                // For partially-generated files, check if diagnostic is in a manual section
-                let in_manual_section = if let Some(ref ranges) = manual_ranges {
-                    ranges.iter().any(|r| r.contains_range(diag.range))
-                } else {
-                    true
-                };
-
-                // Include diagnostic if it's in a manual section, or if include_generated is true
-                let should_include = in_manual_section || config.include_generated;
-
-                // Strip fixes from diagnostics in generated code (outside manual sections)
-                if !in_manual_section {
-                    diag.fixes = None;
-                }
-
-                if is_enabled && app_allowed && should_include {
-                    res.push(diag);
-                }
-            }
-        }
-    });
 }
 
 /// Enum to represent either type of linter for unified processing
