@@ -161,7 +161,7 @@ impl Semantic<'_> {
 
     pub fn function_def_id(&self, function_id: &InFile<FunctionClauseId>) -> Option<FunctionDefId> {
         let def_map = self.def_map(function_id.file_id);
-        def_map.function_def_id(&function_id.value).cloned()
+        def_map.function_def_id(function_id).cloned()
     }
 
     pub fn to_expr(&self, expr: InFile<&ast::Expr>) -> Option<InFunctionClauseBody<'_, ExprId>> {
@@ -1082,8 +1082,7 @@ impl Semantic<'_> {
         let def_map = self.def_map_local(file_id);
         let mut res = FxHashSet::default();
         for (function_id, _def) in def_map.get_function_clauses() {
-            let function_id = InFile::new(file_id, *function_id);
-            let body = self.db.function_clause_body(function_id);
+            let body = self.db.function_clause_body(*function_id);
 
             body.fold(
                 Strategy {
@@ -1092,7 +1091,7 @@ impl Semantic<'_> {
                 },
                 (),
                 &mut |acc, ctx| {
-                    if let Some(mut resolver) = self.clause_resolver(function_id) {
+                    if let Some(mut resolver) = self.clause_resolver(*function_id) {
                         let mut bound_vars =
                             BoundVarsInPat::new(self, &mut resolver, file_id, &mut res);
                         match ctx.item {

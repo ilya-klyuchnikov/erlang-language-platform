@@ -25,8 +25,10 @@ use elp_base_db::module_name;
 use elp_syntax::AstNode;
 use elp_syntax::ast;
 use elp_syntax::match_ast;
+use fxhash::FxBuildHasher;
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
+use indexmap::IndexMap;
 use lazy_static::lazy_static;
 
 use crate::CallbackDef;
@@ -61,11 +63,14 @@ use crate::preprocessor::MacroEnvironment;
 pub struct DefMap {
     included: FxHashSet<FileId>,
 
-    pub function_clauses: FxHashMap<FunctionClauseId, FunctionClauseDef>,
+    /// Function clauses, kept in deterministic source order via
+    /// `sort_function_clauses` after construction (sorted by
+    /// `(file_id, FunctionClauseId)`).
+    function_clauses: IndexMap<InFile<FunctionClauseId>, FunctionClauseDef, FxBuildHasher>,
     functions: FxHashMap<InFile<FunctionDefId>, FunctionDef>,
 
     functions_by_fa: FxHashMap<NameArity, InFile<FunctionDefId>>,
-    function_by_function_id: FxHashMap<FunctionClauseId, FunctionDefId>,
+    function_by_function_id: FxHashMap<InFile<FunctionClauseId>, FunctionDefId>,
 
     /// Specs that aren't associated to any defined function
     unowned_specs: FxHashMap<NameArity, SpecDef>,
@@ -206,7 +211,9 @@ impl DefMap {
                         doc_id: last_doc_attribute,
                         doc_metadata_id: last_doc_metadata_attribute,
                     };
-                    def_map.function_clauses.insert(idx, function_def);
+                    def_map
+                        .function_clauses
+                        .insert(InFile::new(file_id, idx), function_def);
                     last_doc_attribute = None;
                     last_doc_metadata_attribute = None;
                 }
@@ -434,6 +441,7 @@ impl DefMap {
             remote.merge(&local);
             remote.fixup_exports();
             remote.fixup_deprecated();
+            remote.sort_function_clauses();
             Arc::new(remote)
         }
     }
@@ -495,6 +503,7 @@ impl DefMap {
             remote.merge(&local);
             remote.fixup_exports();
             remote.fixup_deprecated();
+            remote.sort_function_clauses();
             Arc::new(remote)
         }
     }
@@ -512,7 +521,10 @@ impl DefMap {
         self.functions.get(function_id)
     }
 
-    pub fn function_def_id(&self, function_id: &FunctionClauseId) -> Option<&FunctionDefId> {
+    pub fn function_def_id(
+        &self,
+        function_id: &InFile<FunctionClauseId>,
+    ) -> Option<&FunctionDefId> {
         self.function_by_function_id.get(function_id)
     }
 
@@ -568,21 +580,17 @@ impl DefMap {
         self.export_all
     }
 
-    pub fn get_function_clauses(
-        &self,
-    ) -> impl Iterator<Item = (&FunctionClauseId, &FunctionClauseDef)> {
-        self.function_clauses.iter()
+    pub fn function_clause(&self, id: &InFile<FunctionClauseId>) -> Option<&FunctionClauseDef> {
+        self.function_clauses.get(id)
     }
 
-    pub fn get_function_clauses_ordered(&self) -> Vec<(FunctionClauseId, FunctionClauseDef)> {
-        // We can't use a BTreeMap for this because of the lack of Ord for Idx<_>.
-        let mut v: Vec<(FunctionClauseId, FunctionClauseDef)> = Vec::from_iter(
-            self.function_clauses
-                .iter()
-                .map(|(k, v)| ((*k), (*v).clone())),
-        );
-        v.sort_by(|(ka, _), (kb, _)| ka.into_raw().cmp(&kb.into_raw()));
-        v
+    /// Iterate function clauses in deterministic order, sorted by
+    /// `(file_id, FunctionClauseId)`. Order is established by
+    /// `sort_function_clauses` at the end of construction.
+    pub fn get_function_clauses(
+        &self,
+    ) -> impl Iterator<Item = (&InFile<FunctionClauseId>, &FunctionClauseDef)> {
+        self.function_clauses.iter()
     }
 
     pub fn get_imports(&self) -> &FxHashMap<NameArity, Name> {
@@ -774,35 +782,50 @@ impl DefMap {
         self.behaviours.extend(other.behaviours.iter().cloned());
     }
 
+    /// Sort `function_clauses` in place by `(file_id, FunctionClauseId)`.
+    /// Must be called after any mutation of `function_clauses` and before any
+    /// consumer reads the iteration order via `get_function_clauses`.
+    fn sort_function_clauses(&mut self) {
+        // BTreeMap can't be used directly because Idx<_> lacks Ord.
+        self.function_clauses.sort_by(|a, _, b, _| {
+            a.file_id
+                .cmp(&b.file_id)
+                .then_with(|| a.value.into_raw().cmp(&b.value.into_raw()))
+        });
+    }
+
     fn fixup_functions(&mut self) {
         // We parse each function clause independently as a top level
         // form, to improve error recovery.
         // These have been lowered into self.function_clauses.
         // Work through them and construct the top level function
         // definitions by combining the ones that belong together.
+        self.sort_function_clauses();
+        let clauses: Vec<FunctionClauseDef> = self
+            .get_function_clauses()
+            .map(|(_id, def)| def.clone())
+            .collect();
         let mut current: Vec<(NameArity, FunctionClauseDef)> = Vec::default();
         let mut prior_separator = None;
-        self.get_function_clauses_ordered()
-            .iter()
-            .for_each(|(_next_id, next_def)| {
-                if let Some((current_na, _def)) = current.first() {
-                    if current_na == &next_def.function_clause.name
-                        || (next_def.function_clause.is_macro
-                            && prior_separator == Some(ast::ClauseSeparator::Semi))
-                    {
-                        current.push((next_def.function_clause.name.clone(), next_def.clone()));
-                    } else {
-                        // We have a new one, create a FunctionDef with
-                        // the ones in current.
-                        let so_far = mem::take(&mut current);
-                        self.insert_fun(so_far);
-                        current.push((next_def.function_clause.name.clone(), next_def.clone()));
-                    }
+        for next_def in clauses {
+            if let Some((current_na, _def)) = current.first() {
+                if current_na == &next_def.function_clause.name
+                    || (next_def.function_clause.is_macro
+                        && prior_separator == Some(ast::ClauseSeparator::Semi))
+                {
+                    current.push((next_def.function_clause.name.clone(), next_def.clone()));
                 } else {
+                    // We have a new one, create a FunctionDef with
+                    // the ones in current.
+                    let so_far = mem::take(&mut current);
+                    self.insert_fun(so_far);
                     current.push((next_def.function_clause.name.clone(), next_def.clone()));
                 }
-                prior_separator = next_def.function_clause.separator.clone().map(|s| s.0);
-            });
+            } else {
+                current.push((next_def.function_clause.name.clone(), next_def.clone()));
+            }
+            prior_separator = next_def.function_clause.separator.clone().map(|s| s.0);
+        }
         if !current.is_empty() {
             self.insert_fun(current)
         }
@@ -846,7 +869,7 @@ impl DefMap {
         self.function_by_function_id.extend(
             fun.function_clause_ids
                 .iter()
-                .map(|id| (*id, function_def_id)),
+                .map(|id| (InFile::new(file.file_id, *id), function_def_id)),
         );
         let id = InFile::new(file.file_id, function_def_id);
         self.functions.insert(id, fun);

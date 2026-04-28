@@ -119,10 +119,9 @@ fn head_mismatch_semantic(
     sema: &Semantic,
     file_id: FileId,
 ) -> Vec<GenericLinterMatchContext<Context>> {
-    let def_map = sema.def_map(file_id);
+    let def_map = sema.def_map_local(file_id);
     let head_info = def_map
-        .get_function_clauses_ordered()
-        .iter()
+        .get_function_clauses()
         .filter_map(|(_idx, def)| {
             let ast_fun = def.source(sema.db.upcast());
             if let Some(clause) = match ast_fun.clause() {
@@ -567,6 +566,48 @@ mod tests {
         %% | Related info: 0:44-53 Mismatched clause name
        end,
        F().
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_head_no_false_mismatch_from_included_clauses() {
+        // When a header file defines function clauses whose
+        // FunctionClauseIds collide with the main file's IDs,
+        // the included clauses must not be interleaved into the
+        // main file's partition_to_funs grouping.
+        check_diagnostics(
+            r#"
+//- /include/helpers.hrl include_path:/include
+    -define(HELPER, ok).
+    helper() -> ok.
+//- /src/main.erl
+    -module(main).
+    -include("helpers.hrl").
+    foo(0) -> ?HELPER;
+    foo(1) -> 2.
+
+    bar(X) -> X.
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_head_mismatch_with_include() {
+        // A genuine head mismatch in the main file is still detected
+        // even when headers are included.
+        check_diagnostics(
+            r#"
+//- /include/helpers.hrl include_path:/include
+    -define(HELPER, ok).
+    helper() -> ok.
+//- /src/main.erl
+    -module(main).
+    -include("helpers.hrl").
+    foo(0) -> ?HELPER;
+    boo(1) -> 2.
+ %% ^^^ 💡 error: P1700: head mismatch 'boo' vs 'foo'
+ %%   | Related info: 1:52-55 Mismatched clause name
             "#,
         );
     }

@@ -18,6 +18,7 @@ use hir::DefMap;
 use hir::DefineDef;
 use hir::FunctionClauseDef;
 use hir::FunctionDef;
+use hir::InFile;
 use hir::RecordDef;
 use hir::Semantic;
 use hir::TypeAliasDef;
@@ -57,7 +58,8 @@ impl ToDocumentSymbol for FunctionDef {
         let mut children = Vec::new();
         if self.function_clause_ids.len() > 1 {
             for clause_id in &self.function_clause_ids {
-                if let Some(function_clause_def) = def_map.function_clauses.get(clause_id)
+                let in_file_id = InFile::new(self.file.file_id, *clause_id);
+                if let Some(function_clause_def) = def_map.function_clause(&in_file_id)
                     && let Some(child) = function_clause_def.to_document_symbol(db, def_map)
                 {
                     children.push(child);
