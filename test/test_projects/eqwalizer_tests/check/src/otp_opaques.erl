@@ -128,3 +128,6 @@ test6_wip(X) ->
 ) -> nok.
 test7_neg(X) ->
     X().
+
+-spec ts1(sets:set(a)) -> atom().
+ts1(X) -> X.
