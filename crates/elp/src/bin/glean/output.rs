@@ -31,6 +31,7 @@ use super::types::Schema2CommentFact;
 use super::types::Schema2DeclLocation;
 use super::types::Schema2Declaration;
 use super::types::Schema2FileDeclarations;
+use super::types::Schema2FileIncludes;
 use super::types::Schema2Fqn;
 use super::types::Schema2FuncDecl;
 use super::types::Schema2FuncDef;
@@ -651,6 +652,7 @@ impl IndexedFacts {
         let module_facts = mem::take(&mut self.module_facts);
         let mut module2_decls: Vec<Key<Schema2ModuleDecl>> = vec![];
         let mut module2_defs: Vec<Key<Schema2ModuleDef>> = vec![];
+        let mut file_includes: Vec<Key<Schema2FileIncludes>> = vec![];
         for mf in module_facts {
             let app = apps.get(&mf.file_id).unwrap_or(&unknown);
             let decl = Schema2ModuleDecl {
@@ -682,6 +684,13 @@ impl IndexedFacts {
                     }
                 })
                 .collect();
+            file_includes.extend(mf.included_files.iter().map(|inc| {
+                Schema2FileIncludes {
+                    file_id: mf.file_id.clone(),
+                    included: inc.clone(),
+                }
+                .into()
+            }));
             let (cb_defs, cb_decls): (Vec<_>, Vec<_>) = mf
                 .callbacks
                 .iter()
@@ -758,6 +767,9 @@ impl IndexedFacts {
                 facts: file_decls_list,
             },
             Fact::DeclComment2 { facts: comments },
+            Fact::FileIncludes2 {
+                facts: file_includes,
+            },
         ]
     }
 

@@ -89,6 +89,8 @@ pub(crate) struct ModuleFact {
     pub(crate) on_load_fns: Vec<String>,
     #[serde(skip)]
     pub(crate) nif_fns: Vec<(String, u32)>,
+    #[serde(skip)]
+    pub(crate) included_files: Vec<GleanFileId>,
 }
 
 #[derive(Debug, Clone)]
@@ -221,6 +223,10 @@ pub(crate) enum Fact {
     },
     #[serde(rename = "erlang.DeclarationComment.2")]
     DeclComment2 { facts: Vec<Key<Schema2CommentFact>> },
+    #[serde(rename = "erlang.FileIncludes.2")]
+    FileIncludes2 {
+        facts: Vec<Key<Schema2FileIncludes>>,
+    },
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -571,6 +577,15 @@ pub(crate) struct Schema2ModuleDef {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) exdoc_link: Option<String>,
     pub(crate) compile_options: Vec<String>,
+}
+
+// ── File-level types ──
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2FileIncludes {
+    #[serde(rename = "file")]
+    pub(crate) file_id: GleanFileId,
+    pub(crate) included: GleanFileId,
 }
 
 // ── Location types ──

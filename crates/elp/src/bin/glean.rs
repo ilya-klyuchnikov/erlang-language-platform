@@ -464,6 +464,12 @@ impl GleanIndexer {
         let exdoc_link: Option<String> = None; // @oss-only
 
         let def_map = db.def_map(file_id);
+
+        let included_files: Vec<GleanFileId> = def_map
+            .get_included_files()
+            .map(GleanFileId::from)
+            .collect();
+
         let callbacks: Vec<types::CallbackInfo> = def_map
             .get_callbacks()
             .iter()
@@ -536,6 +542,7 @@ impl GleanIndexer {
             compile_options,
             on_load_fns,
             nif_fns,
+            included_files,
         }
     }
 
