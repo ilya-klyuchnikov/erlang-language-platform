@@ -684,6 +684,15 @@ impl IndexedFacts {
                     }
                 })
                 .collect();
+            macro_decls.extend(mf.all_macros.iter().map(|mi| {
+                Schema2MacroDecl {
+                    name: mi.name.clone(),
+                    arity: mi.arity,
+                    module: mf.name.clone(),
+                    app: app.clone(),
+                }
+                .into()
+            }));
             record_field_decls.extend(mf.record_fields.iter().map(|rf| {
                 Schema2RecordFieldDecl {
                     record_name: rf.record_name.clone(),

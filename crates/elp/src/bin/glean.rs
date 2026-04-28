@@ -483,6 +483,15 @@ impl GleanIndexer {
 
         let def_map = db.def_map(file_id);
 
+        let all_macros: Vec<types::MacroInfo> = def_map
+            .get_macros()
+            .keys()
+            .map(|mn| types::MacroInfo {
+                name: mn.name().to_string(),
+                arity: mn.arity(),
+            })
+            .collect();
+
         let record_fields: Vec<types::RecordFieldInfo> = def_map
             .get_records()
             .iter()
@@ -575,6 +584,7 @@ impl GleanIndexer {
             nif_fns,
             included_files,
             record_fields,
+            all_macros,
         }
     }
 

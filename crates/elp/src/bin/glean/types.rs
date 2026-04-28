@@ -94,6 +94,14 @@ pub(crate) struct ModuleFact {
     pub(crate) included_files: Vec<GleanFileId>,
     #[serde(skip)]
     pub(crate) record_fields: Vec<RecordFieldInfo>,
+    #[serde(skip)]
+    pub(crate) all_macros: Vec<MacroInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct MacroInfo {
+    pub(crate) name: String,
+    pub(crate) arity: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
