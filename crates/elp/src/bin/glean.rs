@@ -104,6 +104,7 @@ use types::Key;
 use types::Location;
 use types::MacroDecl;
 use types::MacroTarget;
+use types::ModuleDocComment;
 use types::ModuleFact;
 use types::RecordDecl;
 use types::RecordTarget;
@@ -456,13 +457,12 @@ impl GleanIndexer {
         let module_attribute = sema.module_attribute(file_id);
         let module_doc = module_attribute.as_ref().and_then(|ma| {
             let docs = Documentation::new(db, &sema);
-            docs.to_doc(InFile::new(file_id, ma))
+            let text = docs
+                .to_doc(InFile::new(file_id, ma))
                 .map(|doc| doc.markdown_text().to_string())
-                .filter(|text| !text.is_empty())
-        });
+                .filter(|text| !text.is_empty())?;
 
-        let module_doc_span: Option<Location> = if module_doc.is_some() {
-            form_list
+            let span = form_list
                 .moduledoc_attributes()
                 .next()
                 .map(|(_, attr)| {
@@ -470,14 +470,13 @@ impl GleanIndexer {
                     ast.syntax().text_range().into()
                 })
                 .or_else(|| {
-                    module_attribute.as_ref().and_then(|ma| {
-                        sema.module_edoc_header(file_id, ma)
-                            .and_then(|edoc| edoc.doc.as_ref().map(|d| d.range.into()))
-                    })
+                    sema.module_edoc_header(file_id, ma)
+                        .and_then(|edoc| edoc.doc.as_ref().map(|d| d.range.into()))
                 })
-        } else {
-            None
-        };
+                .unwrap_or_else(|| ma.syntax().text_range().into());
+
+            Some(ModuleDocComment { text, span })
+        });
 
         // @fb-only: let exdoc_link = elp_ide::meta_only::exdoc_links::module_exdoc_link(&module, &sema);
         let exdoc_link: Option<String> = None; // @oss-only
@@ -576,7 +575,6 @@ impl GleanIndexer {
             nif_fns,
             included_files,
             record_fields,
-            module_doc_span,
         }
     }
 
@@ -795,6 +793,33 @@ impl GleanIndexer {
                             target: Box::new(decl.clone()),
                             span: doc_range.into(),
                             text: doc,
+                        }
+                        .into(),
+                    ));
+                }
+                if let Some(doc_id) = def.doc_id {
+                    let form_list = db.file_form_list(file_id);
+                    let attr = form_list[doc_id].form_id.get_ast(db, file_id);
+                    let doc_range = attr.syntax().text_range();
+                    let text = attr.syntax().text().to_string();
+                    declarations.push(Declaration::DocDeclaration(
+                        DocDecl {
+                            target: Box::new(decl.clone()),
+                            span: doc_range.into(),
+                            text,
+                        }
+                        .into(),
+                    ));
+                } else if let Some(edoc) = def.edoc_comments(db)
+                    && let Some(doc_tag) = &edoc.doc
+                    && let Some(markdown) = doc_tag.to_markdown()
+                {
+                    let span = doc_tag.range.into();
+                    declarations.push(Declaration::DocDeclaration(
+                        DocDecl {
+                            target: Box::new(decl.clone()),
+                            span,
+                            text: markdown,
                         }
                         .into(),
                     ));

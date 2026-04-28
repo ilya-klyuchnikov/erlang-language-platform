@@ -11,6 +11,7 @@
 use elp_ide::TextRange;
 use elp_ide::elp_ide_db::elp_base_db::FileId;
 use serde::Serialize;
+use serde::Serializer;
 
 #[derive(Serialize, Debug, Eq, Hash, PartialEq, Clone)]
 pub(crate) struct GleanFileId(u32);
@@ -78,7 +79,7 @@ pub(crate) struct ModuleFact {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) behaviours: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) module_doc: Option<String>,
+    pub(crate) module_doc: Option<ModuleDocComment>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) exdoc_link: Option<String>,
     #[serde(skip)]
@@ -93,12 +94,6 @@ pub(crate) struct ModuleFact {
     pub(crate) included_files: Vec<GleanFileId>,
     #[serde(skip)]
     pub(crate) record_fields: Vec<RecordFieldInfo>,
-    #[serde(skip)]
-    #[expect(
-        dead_code,
-        reason = "used by DeclarationComment emission in next commit"
-    )]
-    pub(crate) module_doc_span: Option<Location>,
 }
 
 #[derive(Debug, Clone)]
@@ -154,6 +149,18 @@ pub(crate) struct Location {
 impl From<Location> for TextRange {
     fn from(val: Location) -> Self {
         TextRange::at(val.start.into(), val.length.into())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ModuleDocComment {
+    pub(crate) text: String,
+    pub(crate) span: Location,
+}
+
+impl Serialize for ModuleDocComment {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.text.serialize(serializer)
     }
 }
 

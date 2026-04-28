@@ -720,6 +720,17 @@ impl IndexedFacts {
                 .unzip();
             callback_defs.extend(cb_defs);
             callback_decls.extend(cb_decls);
+            if let Some(doc) = mf.module_doc {
+                comments.push(
+                    Schema2CommentFact {
+                        declaration: Schema2Declaration::Module(decl.clone().into()),
+                        file_id: mf.file_id.clone(),
+                        span: doc.span,
+                        text: Some(doc.text),
+                    }
+                    .into(),
+                );
+            }
             module2_defs.push(
                 Schema2ModuleDef {
                     declaration: decl.clone().into(),

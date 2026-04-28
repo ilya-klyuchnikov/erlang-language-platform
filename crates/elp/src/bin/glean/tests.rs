@@ -78,7 +78,13 @@ fn serialization_test() {
         oncall: Some("test_team".to_string()),
         exports: Some(vec![format!("{func_name}/{arity}")]),
         behaviours: Some(vec!["test_behaviour".to_string()]),
-        module_doc: Some("Test module documentation".to_string()),
+        module_doc: Some(ModuleDocComment {
+            text: "Test module documentation".to_string(),
+            span: Location {
+                start: 0,
+                length: 42,
+            },
+        }),
         exdoc_link: Some("https://example.com/docs/test_module.html".to_string()),
         callbacks: vec![],
         compile_options: vec![],
@@ -86,7 +92,6 @@ fn serialization_test() {
         nif_fns: vec![],
         included_files: vec![],
         record_fields: vec![],
-        module_doc_span: None,
     };
 
     let facts = IndexedFacts {
