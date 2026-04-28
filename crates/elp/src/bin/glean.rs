@@ -485,10 +485,14 @@ impl GleanIndexer {
 
         let all_macros: Vec<types::MacroInfo> = def_map
             .get_macros()
-            .keys()
-            .map(|mn| types::MacroInfo {
-                name: mn.name().to_string(),
-                arity: mn.arity(),
+            .iter()
+            .map(|(mn, macro_def)| {
+                let definition_text = Some(macro_def.source(db).syntax().text().to_string());
+                types::MacroInfo {
+                    name: mn.name().to_string(),
+                    arity: mn.arity(),
+                    definition_text,
+                }
             })
             .collect();
 

@@ -326,7 +326,7 @@ impl IndexedFacts {
         let mut record_field_decls: Vec<Key<Schema2RecordFieldDecl>> = vec![];
         let mut var_decls: Vec<Key<Schema2VarDecl>> = vec![];
         let mut func_defs: Vec<Key<Schema2FuncDef>> = vec![];
-        let macro_defs: Vec<Key<Schema2MacroDef>> = vec![]; // TODO: populate with definition_text
+        let mut macro_defs: Vec<Key<Schema2MacroDef>> = vec![];
         let record_defs: Vec<Key<Schema2RecordDef>> = vec![]; // TODO: populate with definition_text
         let mut type_defs: Vec<Key<Schema2TypeDef>> = vec![];
         let mut callback_defs: Vec<Key<Schema2CallbackDef>> = vec![];
@@ -684,15 +684,26 @@ impl IndexedFacts {
                     }
                 })
                 .collect();
-            macro_decls.extend(mf.all_macros.iter().map(|mi| {
-                Schema2MacroDecl {
-                    name: mi.name.clone(),
-                    arity: mi.arity,
-                    module: mf.name.clone(),
-                    app: app.clone(),
-                }
-                .into()
-            }));
+            let (mc_defs, mc_decls): (Vec<_>, Vec<_>) = mf
+                .all_macros
+                .iter()
+                .map(|mi| {
+                    let decl = Schema2MacroDecl {
+                        name: mi.name.clone(),
+                        arity: mi.arity,
+                        module: mf.name.clone(),
+                        app: app.clone(),
+                    };
+                    let def = Schema2MacroDef {
+                        declaration: decl.clone().into(),
+                        definition_text: mi.definition_text.clone(),
+                    }
+                    .into();
+                    (def, decl.into())
+                })
+                .unzip();
+            macro_defs.extend(mc_defs);
+            macro_decls.extend(mc_decls);
             record_field_decls.extend(mf.record_fields.iter().map(|rf| {
                 Schema2RecordFieldDecl {
                     record_name: rf.record_name.clone(),

@@ -102,6 +102,7 @@ pub(crate) struct ModuleFact {
 pub(crate) struct MacroInfo {
     pub(crate) name: String,
     pub(crate) arity: Option<u32>,
+    pub(crate) definition_text: Option<String>,
 }
 
 #[derive(Debug, Clone)]
