@@ -11,6 +11,7 @@
 use std::mem;
 
 use fxhash::FxHashMap;
+use fxhash::FxHashSet;
 use itertools::Itertools;
 
 use super::types::CommentFact;
@@ -316,6 +317,9 @@ impl IndexedFacts {
         apps: &FxHashMap<GleanFileId, String>,
     ) -> Vec<Fact> {
         let unknown = "unknown".to_string();
+        let mut known_files: FxHashSet<GleanFileId> =
+            self.file_facts.iter().map(|f| f.file_id.clone()).collect();
+        let mut extra_file_facts: Vec<FileFact> = vec![];
 
         let mut func_decls: Vec<Key<Schema2FuncDecl>> = vec![];
         let mut macro_decls: Vec<Key<Schema2MacroDecl>> = vec![];
@@ -725,13 +729,22 @@ impl IndexedFacts {
                 }
                 .into()
             }));
-            file_includes.extend(mf.included_files.iter().map(|inc| {
-                Schema2FileIncludes {
-                    file_id: mf.file_id.clone(),
-                    included: inc.clone(),
+            for (inc_id, inc_path) in &mf.included_files {
+                if !known_files.contains(inc_id) {
+                    extra_file_facts.push(FileFact::new_from_glean_id(
+                        inc_id.clone(),
+                        inc_path.clone(),
+                    ));
+                    known_files.insert(inc_id.clone());
                 }
-                .into()
-            }));
+                file_includes.push(
+                    Schema2FileIncludes {
+                        file_id: mf.file_id.clone(),
+                        included: inc_id.clone(),
+                    }
+                    .into(),
+                );
+            }
             let (cb_defs, cb_decls): (Vec<_>, Vec<_>) = mf
                 .callbacks
                 .iter()
@@ -777,7 +790,13 @@ impl IndexedFacts {
             module2_decls.push(decl.into());
         }
 
-        vec![
+        let mut result = vec![];
+        if !extra_file_facts.is_empty() {
+            result.push(Fact::File {
+                facts: extra_file_facts,
+            });
+        }
+        result.extend([
             Fact::FuncDecl2 { facts: func_decls },
             Fact::MacroDecl2 { facts: macro_decls },
             Fact::RecordDecl2 {
@@ -822,7 +841,8 @@ impl IndexedFacts {
             Fact::FileIncludes2 {
                 facts: file_includes,
             },
-        ]
+        ]);
+        result
     }
 
     /// Helper: convert internal Declaration to Schema2Declaration

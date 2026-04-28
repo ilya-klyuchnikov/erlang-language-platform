@@ -43,6 +43,10 @@ impl FileFact {
             file_path,
         }
     }
+
+    pub(crate) fn new_from_glean_id(file_id: GleanFileId, file_path: String) -> Self {
+        Self { file_id, file_path }
+    }
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -91,7 +95,7 @@ pub(crate) struct ModuleFact {
     #[serde(skip)]
     pub(crate) nif_fns: Vec<(String, u32)>,
     #[serde(skip)]
-    pub(crate) included_files: Vec<GleanFileId>,
+    pub(crate) included_files: Vec<(GleanFileId, String)>,
     #[serde(skip)]
     pub(crate) record_fields: Vec<RecordFieldInfo>,
     #[serde(skip)]

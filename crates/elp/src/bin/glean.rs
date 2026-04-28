@@ -423,11 +423,16 @@ impl GleanIndexer {
         let elp_module_index = db.module_index(project_id);
         let module_fact = elp_module_index
             .module_for_file(file_id)
-            .map(|module| Self::module_fact(db, file_id, module));
+            .map(|module| Self::module_fact(db, file_id, module, project_id));
         Some((file_fact, line_fact, file_decl, xrefs, module_fact))
     }
 
-    fn module_fact(db: &RootDatabase, file_id: FileId, module_name: &ModuleName) -> ModuleFact {
+    fn module_fact(
+        db: &RootDatabase,
+        file_id: FileId,
+        module_name: &ModuleName,
+        project_id: ProjectId,
+    ) -> ModuleFact {
         let module = Module {
             file: File { file_id },
         };
@@ -521,9 +526,20 @@ impl GleanIndexer {
             })
             .collect();
 
-        let included_files: Vec<GleanFileId> = def_map
+        let project_data = db.project_data(project_id);
+        let root = project_data.root_dir.as_path();
+        let included_files: Vec<(GleanFileId, String)> = def_map
             .get_included_files()
-            .map(GleanFileId::from)
+            .filter_map(|inc_file_id| {
+                let sr_id = db.file_source_root(inc_file_id);
+                let sr = db.source_root(sr_id);
+                let path = sr.path_for_file(&inc_file_id)?;
+                let rel_path = path.as_path()?.strip_prefix(root)?;
+                Some((
+                    GleanFileId::from(inc_file_id),
+                    rel_path.as_str().to_string(),
+                ))
+            })
             .collect();
 
         let callbacks: Vec<types::CallbackInfo> = def_map
