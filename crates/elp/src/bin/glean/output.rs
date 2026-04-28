@@ -323,7 +323,7 @@ impl IndexedFacts {
         let mut type_decls: Vec<Key<Schema2TypeDecl>> = vec![];
         let mut header_decls: Vec<Key<Schema2HeaderDecl>> = vec![];
         let mut callback_decls: Vec<Key<Schema2CallbackDecl>> = vec![];
-        let record_field_decls: Vec<Key<Schema2RecordFieldDecl>> = vec![]; // TODO: populate
+        let mut record_field_decls: Vec<Key<Schema2RecordFieldDecl>> = vec![];
         let mut var_decls: Vec<Key<Schema2VarDecl>> = vec![];
         let mut func_defs: Vec<Key<Schema2FuncDef>> = vec![];
         let macro_defs: Vec<Key<Schema2MacroDef>> = vec![]; // TODO: populate with definition_text
@@ -684,6 +684,15 @@ impl IndexedFacts {
                     }
                 })
                 .collect();
+            record_field_decls.extend(mf.record_fields.iter().map(|rf| {
+                Schema2RecordFieldDecl {
+                    record_name: rf.record_name.clone(),
+                    field_name: rf.field_name.clone(),
+                    module: mf.name.clone(),
+                    app: app.clone(),
+                }
+                .into()
+            }));
             file_includes.extend(mf.included_files.iter().map(|inc| {
                 Schema2FileIncludes {
                     file_id: mf.file_id.clone(),

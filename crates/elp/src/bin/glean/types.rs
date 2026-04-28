@@ -91,6 +91,14 @@ pub(crate) struct ModuleFact {
     pub(crate) nif_fns: Vec<(String, u32)>,
     #[serde(skip)]
     pub(crate) included_files: Vec<GleanFileId>,
+    #[serde(skip)]
+    pub(crate) record_fields: Vec<RecordFieldInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RecordFieldInfo {
+    pub(crate) record_name: String,
+    pub(crate) field_name: String,
 }
 
 #[derive(Debug, Clone)]

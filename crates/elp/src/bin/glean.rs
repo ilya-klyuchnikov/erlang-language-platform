@@ -465,6 +465,19 @@ impl GleanIndexer {
 
         let def_map = db.def_map(file_id);
 
+        let record_fields: Vec<types::RecordFieldInfo> = def_map
+            .get_records()
+            .iter()
+            .flat_map(|(name, rec_def)| {
+                rec_def
+                    .fields(db)
+                    .map(move |(field_name, _)| types::RecordFieldInfo {
+                        record_name: name.to_string(),
+                        field_name: field_name.to_string(),
+                    })
+            })
+            .collect();
+
         let included_files: Vec<GleanFileId> = def_map
             .get_included_files()
             .map(GleanFileId::from)
@@ -543,6 +556,7 @@ impl GleanIndexer {
             on_load_fns,
             nif_fns,
             included_files,
+            record_fields,
         }
     }
 
