@@ -499,6 +499,7 @@ pub enum Key {
     PartialOrd
 )]
 pub struct TupleKey {
+    #[serde(default)]
     pub keys: Vec<Key>,
 }
 
