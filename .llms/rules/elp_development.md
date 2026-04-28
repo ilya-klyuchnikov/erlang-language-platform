@@ -38,7 +38,7 @@ Add missing atoms to `known_names!` in `crates/hir/src/name.rs` (alphabetical wi
 
 ### Use `assert_eq_expected!`, not `assert_eq!`
 
-First argument must be named `expected` or start with `expected`:
+First argument must be a constant or named `expected` or start with `expected`:
 ```rust
 use elp_base_db::assert_eq_expected;
 assert_eq_expected!(expected_range, actual_range);
