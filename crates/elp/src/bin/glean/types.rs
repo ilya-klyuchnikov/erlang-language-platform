@@ -93,6 +93,12 @@ pub(crate) struct ModuleFact {
     pub(crate) included_files: Vec<GleanFileId>,
     #[serde(skip)]
     pub(crate) record_fields: Vec<RecordFieldInfo>,
+    #[serde(skip)]
+    #[expect(
+        dead_code,
+        reason = "used by DeclarationComment emission in next commit"
+    )]
+    pub(crate) module_doc_span: Option<Location>,
 }
 
 #[derive(Debug, Clone)]

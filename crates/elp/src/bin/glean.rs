@@ -453,12 +453,31 @@ impl GleanIndexer {
             .map(|(_, behaviour)| behaviour.name.to_string())
             .collect();
 
-        let module_doc = sema.module_attribute(file_id).and_then(|module_attribute| {
+        let module_attribute = sema.module_attribute(file_id);
+        let module_doc = module_attribute.as_ref().and_then(|ma| {
             let docs = Documentation::new(db, &sema);
-            docs.to_doc(InFile::new(file_id, &module_attribute))
+            docs.to_doc(InFile::new(file_id, ma))
                 .map(|doc| doc.markdown_text().to_string())
                 .filter(|text| !text.is_empty())
         });
+
+        let module_doc_span: Option<Location> = if module_doc.is_some() {
+            form_list
+                .moduledoc_attributes()
+                .next()
+                .map(|(_, attr)| {
+                    let ast = attr.form_id.get_ast(db, file_id);
+                    ast.syntax().text_range().into()
+                })
+                .or_else(|| {
+                    module_attribute.as_ref().and_then(|ma| {
+                        sema.module_edoc_header(file_id, ma)
+                            .and_then(|edoc| edoc.doc.as_ref().map(|d| d.range.into()))
+                    })
+                })
+        } else {
+            None
+        };
 
         // @fb-only: let exdoc_link = elp_ide::meta_only::exdoc_links::module_exdoc_link(&module, &sema);
         let exdoc_link: Option<String> = None; // @oss-only
@@ -557,6 +576,7 @@ impl GleanIndexer {
             nif_fns,
             included_files,
             record_fields,
+            module_doc_span,
         }
     }
 
