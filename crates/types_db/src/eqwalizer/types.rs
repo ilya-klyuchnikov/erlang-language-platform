@@ -434,23 +434,47 @@ pub struct RemoteType {
     pub arg_tys: Vec<Type>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BoundVarType {
     pub lvl: u32,
     pub name: StringId,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+impl PartialEq for BoundVarType {
+    fn eq(&self, other: &Self) -> bool {
+        self.lvl == other.lvl
+    }
+}
+
+impl Eq for BoundVarType {}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FreeVarType {
     pub n: u32,
     pub name: StringId,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+impl PartialEq for FreeVarType {
+    fn eq(&self, other: &Self) -> bool {
+        self.n == other.n
+    }
+}
+
+impl Eq for FreeVarType {}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RecordType {
     pub name: StringId,
     pub module: StringId,
 }
+
+impl PartialEq for RecordType {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for RecordType {}
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
