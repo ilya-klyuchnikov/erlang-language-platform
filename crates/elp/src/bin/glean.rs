@@ -88,6 +88,7 @@ const FACTS_FILE: &str = "facts.json";
 pub(crate) mod output;
 pub(crate) mod types;
 
+use output::FactCounts;
 use output::IndexedFacts;
 use output::IndexerMetrics;
 use types::Declaration;
@@ -201,32 +202,36 @@ fn index_inner(
         app_index,
         errored_paths,
     } = indexer.index(config)?;
-    let mut metrics = IndexerMetrics::from_facts(&facts, errored_paths.len());
-    metrics.output_bytes = write_results(facts, module_index, app_index, cli, args)?;
+    let (output_bytes, counts) = write_results(facts, module_index, app_index, cli, args)?;
+    let mut metrics = IndexerMetrics::from_counts(counts, errored_paths.len());
+    metrics.output_bytes = output_bytes;
     Ok((metrics, errored_paths))
 }
 
-/// Serializes and writes facts. Returns total bytes written.
+/// Serializes and writes facts. Returns (total bytes written, accumulated fact counts).
 fn write_results(
     facts: FxHashMap<String, IndexedFacts>,
     module_index: FxHashMap<GleanFileId, String>,
     app_index: FxHashMap<GleanFileId, String>,
     cli: &mut dyn Cli,
     args: &Glean,
-) -> Result<u64> {
+) -> Result<(u64, FactCounts)> {
     if args.v2 {
         eprintln!("elp-glean: --v2 is deprecated and now a no-op (v2 is always enabled)");
     }
     let mut total_bytes: u64 = 0;
+    let mut total_counts = FactCounts::default();
     for (name, fact) in facts {
-        let fact = if args.schema2 {
-            // Dual-write: produce both erlang.1 and erlang.2 facts
-            let mut all_facts = fact.clone().into_glean_facts(&module_index);
-            all_facts.extend(fact.into_schema2_facts(&module_index, &app_index));
-            all_facts
+        let (fact, counts) = if args.schema2 {
+            let (v1_facts, _) = fact.clone().into_glean_facts(&module_index);
+            let (v2_facts, counts) = fact.into_schema2_facts(&module_index, &app_index);
+            let mut all_facts = v1_facts;
+            all_facts.extend(v2_facts);
+            (all_facts, counts)
         } else {
             fact.into_glean_facts(&module_index)
         };
+        total_counts.accumulate(&counts);
         let content = if args.pretty {
             serde_json::to_string_pretty(&fact)?
         } else {
@@ -248,7 +253,7 @@ fn write_results(
             None => cli.write_all(content.as_bytes()),
         }?;
     }
-    Ok(total_bytes)
+    Ok((total_bytes, total_counts))
 }
 
 impl GleanIndexer {

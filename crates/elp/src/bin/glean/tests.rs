@@ -137,7 +137,7 @@ fn schema2_serialization_test() {
     "#;
     let (facts, _, _, _, module_index) = facts_with_annotations(spec);
     let app_index = FxHashMap::default();
-    let schema2_facts = facts.into_schema2_facts(&module_index, &app_index);
+    let (schema2_facts, _) = facts.into_schema2_facts(&module_index, &app_index);
 
     let predicates: Vec<&str> = schema2_facts
         .iter()
@@ -180,8 +180,8 @@ fn schema2_dual_write_test() {
     let app_index = FxHashMap::default();
 
     // Simulate dual-write: clone for v1, original for v2
-    let v1_facts = facts.clone().into_glean_facts(&module_index);
-    let v2_facts = facts.into_schema2_facts(&module_index, &app_index);
+    let (v1_facts, _) = facts.clone().into_glean_facts(&module_index);
+    let (v2_facts, _) = facts.into_schema2_facts(&module_index, &app_index);
 
     // v1 should have FunctionDeclaration.1
     let has_v1_func = v1_facts

@@ -64,6 +64,29 @@ use super::types::XRefTarget;
 const REC_ARITY: u32 = 99;
 const HEADER_ARITY: u32 = 100;
 
+#[derive(Debug, Default)]
+pub(crate) struct FactCounts {
+    pub(crate) file_count: usize,
+    pub(crate) module_count: usize,
+    pub(crate) declaration_count: usize,
+    pub(crate) var_decl_count: usize,
+    pub(crate) macro_usage_count: usize,
+    pub(crate) xref_count: usize,
+    pub(crate) doc_count: usize,
+}
+
+impl FactCounts {
+    pub(crate) fn accumulate(&mut self, other: &FactCounts) {
+        self.file_count += other.file_count;
+        self.module_count += other.module_count;
+        self.declaration_count += other.declaration_count;
+        self.var_decl_count += other.var_decl_count;
+        self.macro_usage_count += other.macro_usage_count;
+        self.xref_count += other.xref_count;
+        self.doc_count += other.doc_count;
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub(crate) struct IndexedFacts {
     pub(crate) file_facts: Vec<FileFact>,
@@ -201,7 +224,7 @@ impl IndexedFacts {
     pub(crate) fn into_glean_facts(
         mut self,
         modules: &FxHashMap<GleanFileId, String>,
-    ) -> Vec<Fact> {
+    ) -> (Vec<Fact>, FactCounts) {
         let file_lines_fact = mem::take(&mut self.file_line_facts);
         let file_lines_fact = file_lines_fact.into_iter().map_into().collect();
         let declaration_fact = mem::take(&mut self.file_declarations);
@@ -236,13 +259,17 @@ impl IndexedFacts {
                 }
             }
         }
+        let declaration_count = declarations.len();
+        let doc_count = comments.len();
         let declaration_fact = declarations.into_iter().map_into().collect();
         let xref_fact = mem::take(&mut self.xrefs);
         let mut xrefs = vec![];
+        let mut xref_count = 0usize;
         for fact in xref_fact {
             let file_id = fact.file_id;
             let mut facts = vec![];
             for xref in fact.xrefs {
+                xref_count += 1;
                 let source = xref.source;
                 let file_id = xref.target.file_id();
                 if let Some(module) = modules.get(file_id) {
@@ -295,8 +322,19 @@ impl IndexedFacts {
         }
         let xref_fact = xrefs.into_iter().map_into().collect();
         let module_facts = mem::take(&mut self.module_facts);
+
+        let counts = FactCounts {
+            file_count: self.file_facts.len(),
+            module_count: module_facts.len(),
+            declaration_count,
+            var_decl_count: 0,
+            macro_usage_count: 0,
+            xref_count,
+            doc_count,
+        };
+
         let module_facts = module_facts.into_iter().map_into().collect();
-        vec![
+        let facts = vec![
             Fact::File {
                 facts: mem::take(&mut self.file_facts),
             },
@@ -311,7 +349,8 @@ impl IndexedFacts {
             Fact::Module {
                 facts: module_facts,
             },
-        ]
+        ];
+        (facts, counts)
     }
 
     /// Convert internal facts to erlang.2 schema output (dual-write).
@@ -319,7 +358,7 @@ impl IndexedFacts {
         mut self,
         modules: &FxHashMap<GleanFileId, String>,
         apps: &FxHashMap<GleanFileId, String>,
-    ) -> Vec<Fact> {
+    ) -> (Vec<Fact>, FactCounts) {
         let unknown = "unknown".to_string();
         let mut known_files: FxHashSet<GleanFileId> =
             self.file_facts.iter().map(|f| f.file_id.clone()).collect();
@@ -540,10 +579,12 @@ impl IndexedFacts {
         let xref_files = mem::take(&mut self.xrefs);
         let mut typed_xrefs: Vec<Key<Schema2XRefsByFile>> = vec![];
         let mut var_xrefs: Vec<Key<Schema2VarXRefsByFile>> = vec![];
+        let mut xref_count = 0usize;
         for xref_file in xref_files {
             let mut file_typed: Vec<Schema2XRef> = vec![];
             let mut var_map: FxHashMap<(String, u32), Vec<Location>> = FxHashMap::default();
             for xref in xref_file.xrefs {
+                xref_count += 1;
                 match &xref.target {
                     XRefTarget::Function(f) => {
                         let target_module = modules.get(&f.key.file_id).unwrap_or(&unknown);
@@ -830,6 +871,23 @@ impl IndexedFacts {
             module2_decls.push(decl.into());
         }
 
+        let counts = FactCounts {
+            file_count: self.file_facts.len(),
+            module_count: module2_decls.len(),
+            declaration_count: func_decls.len()
+                + macro_decls.len()
+                + record_decls.len()
+                + type_decls.len()
+                + header_decls.len()
+                + callback_decls.len()
+                + record_field_decls.len()
+                + module2_decls.len(),
+            var_decl_count: var_decls.len(),
+            macro_usage_count: macro_usages.len(),
+            xref_count,
+            doc_count: comments.len(),
+        };
+
         let mut result = vec![];
         if !extra_file_facts.is_empty() {
             result.push(Fact::File {
@@ -888,7 +946,7 @@ impl IndexedFacts {
                 facts: macro_usage_locations,
             },
         ]);
-        result
+        (result, counts)
     }
 
     /// Helper: convert internal Declaration to Schema2Declaration
@@ -955,7 +1013,11 @@ pub struct IndexerMetrics {
     pub file_count: usize,
     pub module_count: usize,
     pub entity_count: usize,
+    pub declaration_count: usize,
+    pub var_decl_count: usize,
+    pub macro_usage_count: usize,
     pub xref_count: usize,
+    pub doc_count: usize,
     pub output_bytes: u64,
     pub files_errored: usize,
     pub success: bool,
@@ -963,32 +1025,19 @@ pub struct IndexerMetrics {
 }
 
 impl IndexerMetrics {
-    pub(crate) fn from_facts(
-        facts: &FxHashMap<String, IndexedFacts>,
-        files_errored: usize,
-    ) -> Self {
-        let mut file_count = 0;
-        let mut module_count = 0;
-        let mut entity_count = 0;
-        let mut xref_count = 0;
-
-        for indexed in facts.values() {
-            file_count += indexed.file_facts.len();
-            module_count += indexed.module_facts.len();
-            entity_count += indexed
-                .file_declarations
-                .iter()
-                .map(|fd| fd.declarations.len())
-                .sum::<usize>();
-            xref_count += indexed.xrefs.iter().map(|f| f.xrefs.len()).sum::<usize>();
-        }
-
+    pub(crate) fn from_counts(counts: FactCounts, files_errored: usize) -> Self {
+        let entity_count =
+            counts.declaration_count + counts.var_decl_count + counts.macro_usage_count;
         Self {
             duration_ms: 0,
-            file_count,
-            module_count,
+            file_count: counts.file_count,
+            module_count: counts.module_count,
             entity_count,
-            xref_count,
+            declaration_count: counts.declaration_count,
+            var_decl_count: counts.var_decl_count,
+            macro_usage_count: counts.macro_usage_count,
+            xref_count: counts.xref_count,
+            doc_count: counts.doc_count,
             output_bytes: 0,
             files_errored,
             success: true,
@@ -1002,7 +1051,11 @@ impl IndexerMetrics {
             file_count: 0,
             module_count: 0,
             entity_count: 0,
+            declaration_count: 0,
+            var_decl_count: 0,
+            macro_usage_count: 0,
             xref_count: 0,
+            doc_count: 0,
             output_bytes: 0,
             files_errored: 0,
             success: false,
