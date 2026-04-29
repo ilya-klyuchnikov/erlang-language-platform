@@ -751,6 +751,50 @@ fn var_xref_multiple_clauses_test() {
     var_xref_check(spec);
 }
 
+#[test]
+fn type_definition_text_and_opaque_test() {
+    let spec = r#"
+    //- /glean/app_glean/src/type_defs.erl
+    -module(type_defs).
+    -type my_list() :: [integer()].
+    -opaque secret() :: {atom(), binary()}.
+    foo() -> ok.
+    "#;
+    let (facts, _, _, _, _) = facts_with_annotations(spec);
+    let type_decls: Vec<_> = facts
+        .file_declarations
+        .iter()
+        .flat_map(|fd| &fd.declarations)
+        .filter_map(|d| match d {
+            Declaration::TypeDeclaration(t) => Some(&t.key),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(type_decls.len(), 2);
+
+    let my_list = type_decls.iter().find(|t| t.name == "my_list").unwrap();
+    assert!(!my_list.opaque);
+    assert!(my_list.definition_text.is_some());
+    assert!(
+        my_list
+            .definition_text
+            .as_ref()
+            .unwrap()
+            .contains("-type my_list")
+    );
+
+    let secret = type_decls.iter().find(|t| t.name == "secret").unwrap();
+    assert!(secret.opaque);
+    assert!(secret.definition_text.is_some());
+    assert!(
+        secret
+            .definition_text
+            .as_ref()
+            .unwrap()
+            .contains("-opaque secret")
+    );
+}
+
 #[allow(clippy::type_complexity)]
 pub(crate) fn facts_with_annotations(
     spec: &str,

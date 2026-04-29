@@ -443,8 +443,8 @@ impl IndexedFacts {
                             Schema2TypeDef {
                                 declaration: decl.clone().into(),
                                 exported: t.key.exported,
-                                opaque: false,
-                                definition_text: None,
+                                opaque: t.key.opaque,
+                                definition_text: t.key.definition_text.clone(),
                             }
                             .into(),
                         );

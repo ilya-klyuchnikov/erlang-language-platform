@@ -443,6 +443,10 @@ pub(crate) struct TypeDecl {
     pub(crate) arity: u32,
     pub(crate) span: Location,
     pub(crate) exported: bool,
+    #[serde(skip)]
+    pub(crate) opaque: bool,
+    #[serde(skip)]
+    pub(crate) definition_text: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone)]

@@ -886,9 +886,11 @@ impl GleanIndexer {
         }
 
         for (ty, def) in def_map.get_types() {
-            let range = def.source(db).syntax().text_range();
-            let text = &db.file_text(file_id)[range];
-            let text = format!("```erlang\n{text}\n```");
+            let source = def.source(db);
+            let opaque = matches!(source, hir::TypeAliasSource::Opaque(_));
+            let range = source.syntax().text_range();
+            let definition_text = db.file_text(file_id)[range].to_string();
+            let text = format!("```erlang\n{definition_text}\n```");
             let span: Location = range.into();
 
             let decl = Declaration::TypeDeclaration(
@@ -897,6 +899,8 @@ impl GleanIndexer {
                     arity: ty.arity(),
                     span: span.clone(),
                     exported: def.exported,
+                    opaque,
+                    definition_text: Some(definition_text),
                 }
                 .into(),
             );
