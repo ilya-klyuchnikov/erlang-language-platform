@@ -148,6 +148,46 @@ pub struct PreprocessorAnalysis {
     env_macro_defs: FxHashMap<ConditionEnvId, Arc<FxHashMap<MacroName, InFile<DefineId>>>>,
 }
 
+/// Point-in-time macro definition snapshots, computed on demand.
+///
+/// This struct holds the large per-env and per-condition macro definition
+/// maps that are expensive to keep in Salsa cache. It is produced by
+/// `compute_file_macro_defs` which re-runs the preprocessor pass and
+/// is NOT cached by Salsa, so memory is freed once the caller drops it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PreprocessorMacroDefs {
+    /// Snapshot of macro definitions at each ConditionEnvId point.
+    /// Body lowering uses this to resolve macros with the correct
+    /// point-in-file state instead of the end-of-file final_state.
+    env_macro_defs: FxHashMap<ConditionEnvId, Arc<FxHashMap<MacroName, InFile<DefineId>>>>,
+    /// Snapshot of `-define` macro definitions at the point each `-if`/`-elif`
+    /// condition was encountered. Keyed by condition ID so that downstream
+    /// queries can resolve user-defined macros with the correct
+    /// point-in-time state instead of falling back to `db.resolve_macro()`.
+    condition_macro_defs: FxHashMap<PPConditionId, Arc<FxHashMap<MacroName, InFile<DefineId>>>>,
+}
+
+impl PreprocessorMacroDefs {
+    /// Get the macro definitions snapshot for a specific `ConditionEnvId`.
+    /// Body lowering uses this to resolve macros with the correct point-in-file
+    /// state instead of the end-of-file final_state.
+    pub fn macro_defs_for_env(
+        &self,
+        env_id: ConditionEnvId,
+    ) -> Option<&Arc<FxHashMap<MacroName, InFile<DefineId>>>> {
+        self.env_macro_defs.get(&env_id)
+    }
+
+    /// Get the macro definitions snapshot for a specific `-if`/`-elif` condition.
+    /// Returns `None` if the condition was not found (e.g. ifdef/ifndef/else/endif).
+    pub fn condition_macro_defs(
+        &self,
+        cond_id: PPConditionId,
+    ) -> Option<&Arc<FxHashMap<MacroName, InFile<DefineId>>>> {
+        self.condition_macro_defs.get(&cond_id)
+    }
+}
+
 impl PreprocessorState {
     pub fn new(env: &MacroEnvironment) -> Self {
         Self {
@@ -381,20 +421,47 @@ pub fn file_preprocessor_analysis_with_diagnostics_query(
     file_id: FileId,
     env: Arc<MacroEnvironment>,
 ) -> (Arc<PreprocessorAnalysis>, Arc<ConditionDiagnosticsMap>) {
-    let (analysis, diagnostics_map) = file_preprocessor_analysis_impl(db, file_id, &env);
+    let (analysis, _macro_defs, diagnostics_map) =
+        file_preprocessor_analysis_impl(db, file_id, &env, false);
     (Arc::new(analysis), Arc::new(diagnostics_map))
 }
 
+/// Compute point-in-time macro definition snapshots for a file.
+///
+/// This re-runs the preprocessor pass to collect the `env_macro_defs` and
+/// `condition_macro_defs` maps. The result is NOT cached by Salsa, so
+/// memory is freed once the caller drops it. Sub-queries (parse, form_list,
+/// include resolution) are already Salsa-cached, so the re-run is fast.
+pub fn compute_file_macro_defs(
+    db: &dyn DefDatabase,
+    file_id: FileId,
+    env: Arc<MacroEnvironment>,
+) -> PreprocessorMacroDefs {
+    let (_analysis, macro_defs, _diagnostics) =
+        file_preprocessor_analysis_impl(db, file_id, &env, true);
+    macro_defs
+}
+
 /// Core implementation of preprocessor analysis, shared between the
-/// Salsa-cached query and any on-demand callers.
+/// Salsa-cached query and `compute_file_macro_defs`.
+///
+/// When `compute_macro_defs` is false, skips the expensive per-env and
+/// per-condition macro snapshot work (used by the Salsa query path).
+/// When true, populates `PreprocessorMacroDefs` (used by on-demand callers).
 fn file_preprocessor_analysis_impl(
     db: &dyn DefDatabase,
     file_id: FileId,
     env: &MacroEnvironment,
-) -> (PreprocessorAnalysis, ConditionDiagnosticsMap) {
+    _compute_macro_defs: bool,
+) -> (
+    PreprocessorAnalysis,
+    PreprocessorMacroDefs,
+    ConditionDiagnosticsMap,
+) {
     let form_list = db.file_form_list(file_id);
     let mut state = PreprocessorState::new(env);
     let mut analysis = PreprocessorAnalysis::new();
+    let mut macro_defs = PreprocessorMacroDefs::default();
     let mut diagnostics_map = ConditionDiagnosticsMap::default();
 
     // Track which ConditionEnvIds we've already snapshotted macro state for.
@@ -455,9 +522,11 @@ fn file_preprocessor_analysis_impl(
                             .collect();
                         // Only store non-empty snapshots to reduce memory usage
                         if !trimmed.is_empty() {
+                            let trimmed = Arc::new(trimmed);
                             analysis
                                 .condition_macro_defs
-                                .insert(cond_id, Arc::new(trimmed));
+                                .insert(cond_id, Arc::clone(&trimmed));
+                            macro_defs.condition_macro_defs.insert(cond_id, trimmed);
                         }
                     }
                     // Record diagnostics if any
@@ -493,7 +562,7 @@ fn file_preprocessor_analysis_impl(
     }
 
     analysis.final_state = Some(state.snapshot());
-    (analysis, diagnostics_map)
+    (analysis, macro_defs, diagnostics_map)
 }
 
 /// Outcome of processing a single `-ifdef`/`-ifndef`/`-if`/`-elif`/`-else`/
