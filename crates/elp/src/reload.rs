@@ -86,8 +86,8 @@ fn buck_project_watch_paths(buck_project: &BuckProject) -> Vec<String> {
         })
         .collect();
     if let Some(config_dir) = buck_project.buck_conf.config_dir() {
-        paths.push(format!("{}/.elp.toml", config_dir));
-        paths.push(format!("{}/.elp_lint.toml", config_dir));
+        paths.push(format!("{}/**/.elp.toml", config_dir));
+        paths.push(format!("{}/**/.elp_lint.toml", config_dir));
     }
     paths
 }
