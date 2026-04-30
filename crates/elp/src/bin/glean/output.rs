@@ -432,7 +432,12 @@ impl IndexedFacts {
                                 declaration: decl.clone().into(),
                                 exported: f.key.exported,
                                 deprecated: if f.key.deprecated {
-                                    Some("true".to_string())
+                                    Some(
+                                        f.key
+                                            .deprecated_desc
+                                            .clone()
+                                            .unwrap_or_else(|| "true".to_string()),
+                                    )
                                 } else {
                                     None
                                 },

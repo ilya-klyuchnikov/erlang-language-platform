@@ -424,6 +424,8 @@ pub(crate) struct FuncDecl {
     pub(crate) exported: bool,
     pub(crate) deprecated: bool,
     #[serde(skip)]
+    pub(crate) deprecated_desc: Option<String>,
+    #[serde(skip)]
     pub(crate) spec_text: Option<String>,
 }
 

@@ -827,6 +827,12 @@ impl GleanIndexer {
                     .spec
                     .as_ref()
                     .map(|s| s.source(db).syntax().text().to_string());
+                let deprecated_desc = def.deprecated_desc.as_ref().map(|d| {
+                    use hir::form_list::DeprecatedDesc;
+                    match d {
+                        DeprecatedDesc::Str(s) | DeprecatedDesc::Atom(s) => s.to_string(),
+                    }
+                });
                 let decl = Declaration::FunctionDeclaration(
                     FuncDecl {
                         name: fun.name().to_string(),
@@ -834,6 +840,7 @@ impl GleanIndexer {
                         span,
                         exported: def.exported,
                         deprecated: def.deprecated,
+                        deprecated_desc,
                         spec_text,
                     }
                     .into(),

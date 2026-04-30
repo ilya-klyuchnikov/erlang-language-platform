@@ -52,6 +52,7 @@ fn serialization_test() {
                 span: location.clone(),
                 exported: false,
                 deprecated: false,
+                deprecated_desc: None,
                 spec_text: None,
             }
             .into(),
