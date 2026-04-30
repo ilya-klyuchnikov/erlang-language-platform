@@ -121,6 +121,7 @@ use types::XRefTarget;
 #[derive(Clone, Debug, Default)]
 struct IndexConfig {
     pub multi: bool,
+    pub schema2: bool,
 }
 
 struct IndexResult {
@@ -195,7 +196,10 @@ fn index_inner(
     ifdef: bool,
 ) -> Result<(IndexerMetrics, Vec<String>)> {
     let (indexer, _loaded) = GleanIndexer::new(args, cli, query_config, ifdef)?;
-    let config = IndexConfig { multi: args.multi };
+    let config = IndexConfig {
+        multi: args.multi,
+        schema2: args.schema2,
+    };
     let IndexResult {
         facts,
         module_index,
@@ -287,17 +291,31 @@ impl GleanIndexer {
             let project_id = self.project_id;
             let files = Self::project_files(db, project_id);
             // glean module index, which fake headers as modules with name header.hrl
-            let module_index: FxHashMap<GleanFileId, String> = files
+            let mut module_index: FxHashMap<GleanFileId, String> = files
                 .iter()
                 .filter_map(|(file_id, path)| {
                     path_to_module_name(path).map(|name| ((*file_id).into(), name))
                 })
                 .collect();
+            // Collect OTP source roots for schema v2 facts
+            let otp_source_roots: Vec<_> = if config.schema2 {
+                let project_data = db.project_data(project_id);
+                project_data
+                    .otp_project_id
+                    .map(|otp_id| db.project_data(otp_id).source_roots.clone())
+                    .unwrap_or_default()
+            } else {
+                vec![]
+            };
             // app index: file_id → OTP application name (for erlang.2 schema)
             let app_index: FxHashMap<GleanFileId, String> = {
                 let project_data = db.project_data(project_id);
                 let mut index = FxHashMap::default();
-                for &source_root_id in &project_data.source_roots {
+                for &source_root_id in project_data
+                    .source_roots
+                    .iter()
+                    .chain(otp_source_roots.iter())
+                {
                     if let Some(app_data) = db.app_data(source_root_id) {
                         let app_name = app_data.name.as_str().to_string();
                         let source_root = db.source_root(source_root_id);
@@ -308,6 +326,17 @@ impl GleanIndexer {
                 }
                 index
             };
+            // Extend module_index with OTP files for xrefs to OTP functions
+            for &source_root_id in &otp_source_roots {
+                let source_root = db.source_root(source_root_id);
+                for file_id in source_root.iter() {
+                    if let Some(path) = source_root.path_for_file(&file_id)
+                        && let Some(name) = path_to_module_name(path)
+                    {
+                        module_index.insert(file_id.into(), name);
+                    }
+                }
+            }
             let (facts, errored) = if let Some(module) = &self.module {
                 let index = db.module_index(self.project_id);
                 let file_id = index
