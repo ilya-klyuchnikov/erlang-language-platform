@@ -1,5 +1,47 @@
-enabled_lints =['L1268', 'W0011', 'P1700']
-disabled_lints = ['W0010']
+[linters.application_get_env]
+enabled = false
+
+[linters.no_nowarn_suppressions]
+enabled = false
+
+[linters.unexported_function]
+enabled = false
+
+[linters.unreachable_test]
+enabled = false
+
+[linters.unused_function_arg]
+enabled = true
+
+[linters.undefined_function]
+enabled = false
+
+[linters.misspelled_attribute]
+enabled = false
+
+[linters.module_mismatch]
+enabled = false
+
+[linters.bound_var_in_lhs]
+enabled = false
+
+[linters.head_mismatch]
+enabled = false
+
+[linters.unexpected_separator]
+enabled = false
+
+[linters.L1230]
+enabled = false
+
+[linters.L1268]
+enabled = false
+
+[linters.L1309]
+enabled = false
+
+[linters.L1318]
+enabled = false
 
 [[ad_hoc_lints.lints]]
 type = "ReplaceCall"

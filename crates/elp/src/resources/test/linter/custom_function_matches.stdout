@@ -1,4 +1,3 @@
-Reporting all diagnostics codes
 module specified: custom_function_matches
 Diagnostics reported:
 app_a/src/custom_function_matches.erl:14:5-14:26::[Warning] [W0017] Function 'not_excluded:function/0' is undefined.

@@ -687,6 +687,14 @@ fn should_process_app(
     true
 }
 
+fn is_diagnostic_enabled(config: &DiagnosticsConfig, code: &DiagnosticCode, default: bool) -> bool {
+    if let Some(lint_config) = config.lint_config.as_ref() {
+        lint_config.get_is_enabled_override(code).unwrap_or(default)
+    } else {
+        default
+    }
+}
+
 fn should_run(
     linter: &dyn Linter,
     config: &DiagnosticsConfig,
@@ -714,13 +722,7 @@ fn should_run(
     if !should_process_app(app_name, config, &linter.id()) {
         return false;
     }
-    let is_enabled = if let Some(lint_config) = config.lint_config.as_ref() {
-        lint_config
-            .get_is_enabled_override(&linter.id())
-            .unwrap_or_else(|| linter.is_enabled())
-    } else {
-        linter.is_enabled()
-    };
+    let is_enabled = is_diagnostic_enabled(config, &linter.id(), linter.is_enabled());
     if !is_enabled {
         return false;
     }
@@ -1173,8 +1175,8 @@ pub struct DiagnosticConditions {
     pub experimental: bool,
     pub include_generated: bool,
     pub include_tests: bool,
-    /// By default this diagnostic is disabled. It must be explicitly enabled in
-    /// `LintConfig.enabled_lints`
+    /// By default this diagnostic is disabled. It must be explicitly enabled via
+    /// `[linters.<code>] enabled = true` in the lint config.
     pub default_disabled: bool,
 }
 
@@ -1291,13 +1293,8 @@ impl DiagnosticsConfig {
         diagnostic_filter: &Option<String>,
         diagnostic_ignore: &Option<String>,
     ) -> Result<DiagnosticsConfig> {
-        let mut allowed_diagnostics: FxHashSet<DiagnosticCode> = lint_config
-            .enabled_lints
-            .iter()
-            .cloned()
-            .collect::<FxHashSet<_>>();
-        let mut disabled_diagnostics: FxHashSet<DiagnosticCode> =
-            lint_config.disabled_lints.iter().cloned().collect();
+        let mut allowed_diagnostics: FxHashSet<DiagnosticCode> = FxHashSet::default();
+        let mut disabled_diagnostics: FxHashSet<DiagnosticCode> = FxHashSet::default();
 
         if let Some(diagnostic_ignore) = diagnostic_ignore {
             let diagnostic_ignore = DiagnosticCode::from(diagnostic_ignore.as_str());
@@ -1377,7 +1374,6 @@ impl DiagnosticsConfig {
     }
 
     pub fn enable(mut self, code: DiagnosticCode) -> DiagnosticsConfig {
-        self.enabled.enable(code.clone());
         self.set_linter_enabled(code, true);
         self
     }
@@ -1433,9 +1429,6 @@ impl DiagnosticsConfig {
 impl LintConfig {
     /// Merges this LintConfig with another, with the other config taking precedence.
     pub fn merge(mut self, other: LintConfig) -> LintConfig {
-        self.enabled_lints.extend(other.enabled_lints);
-        self.disabled_lints.extend(other.disabled_lints);
-
         if other.erlang_service.warnings_as_errors {
             self.erlang_service.warnings_as_errors = true;
         }
@@ -1520,11 +1513,8 @@ impl LintConfig {
 /// Configuration file format for lints. Deserialized from .toml
 /// initially.  But could by anything supported by serde.
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct LintConfig {
-    #[serde(default)]
-    pub enabled_lints: Vec<DiagnosticCode>,
-    #[serde(default)]
-    pub disabled_lints: Vec<DiagnosticCode>,
     #[serde(default)]
     pub erlang_service: ErlangServiceConfig,
     #[serde(default)]
@@ -2476,6 +2466,7 @@ pub fn erlang_service_diagnostics(
             .filter(|(_file_id, d)| {
                 !d.should_be_suppressed(&metadata, config)
                     && !config.disabled.contains(&d.code)
+                    && is_diagnostic_enabled(config, &d.code, true)
                     && should_process_app(&app_name, config, &d.code)
             })
             .collect_vec();
@@ -4319,11 +4310,8 @@ main(X) ->
     fn test_lint_config_merge() {
         let code1 = DiagnosticCode::from("W0001");
         let code2 = DiagnosticCode::from("W0002");
-        let code3 = DiagnosticCode::from("W0003");
 
         let mut config1 = LintConfig {
-            enabled_lints: vec![code1.clone()],
-            disabled_lints: vec![code2.clone()],
             ..Default::default()
         };
         config1.erlang_service.warnings_as_errors = false;
@@ -4356,8 +4344,6 @@ main(X) ->
         );
 
         let mut config2 = LintConfig {
-            enabled_lints: vec![code3.clone()],
-            disabled_lints: vec![code1.clone()],
             ..Default::default()
         };
         config2.erlang_service.warnings_as_errors = true;
@@ -4404,14 +4390,6 @@ main(X) ->
         );
 
         let merged = config1.merge(config2);
-
-        assert_eq!(merged.enabled_lints.len(), 2);
-        assert!(merged.enabled_lints.contains(&code1));
-        assert!(merged.enabled_lints.contains(&code3));
-
-        assert_eq!(merged.disabled_lints.len(), 2);
-        assert!(merged.disabled_lints.contains(&code2));
-        assert!(merged.disabled_lints.contains(&code1));
 
         assert!(merged.erlang_service.warnings_as_errors);
 

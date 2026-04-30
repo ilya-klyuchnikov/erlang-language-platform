@@ -1,5 +1,3 @@
-enabled_lints = ["ad-hoc: ssr-match"]
-
 [[ad_hoc_lints.lints]]
 type = "LintMatchSsr"
 ssr_pattern = "ssr: {_@A, = 10}."

@@ -1,4 +1,2 @@
-enabled_lints = []
-disabled_lints = [
-    "W0002"
-]
+[linters.W0002]
+enabled = false

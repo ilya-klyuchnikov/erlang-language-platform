@@ -1,6 +1,3 @@
-enabled_lints = ["ad-hoc: application:get_env/2"]
-# disabled_lints = []
-
 [[ad_hoc_lints.lints]]
 type = "ReplaceCall"
 

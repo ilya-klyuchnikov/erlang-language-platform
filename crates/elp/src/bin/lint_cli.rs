@@ -137,7 +137,7 @@ pub fn run_lint_command(
         fs::create_dir_all(to)?
     };
 
-    let diagnostics_config = get_and_report_diagnostics_config(args, cli)?;
+    let diagnostics_config = get_diagnostics_config(args)?;
 
     // We load the project after loading config, in case it bails with
     // errors. No point wasting time if the config is wrong.
@@ -159,14 +159,6 @@ pub fn run_lint_command(
     }
 
     result
-}
-
-fn get_and_report_diagnostics_config(args: &Lint, cli: &mut dyn Cli) -> Result<DiagnosticsConfig> {
-    let diagnostics_config = get_diagnostics_config(args)?;
-    if diagnostics_config.enabled.all_enabled() && args.is_format_normal() {
-        writeln!(cli, "Reporting all diagnostics codes")?;
-    }
-    Ok(diagnostics_config)
 }
 
 pub fn load_project(
@@ -516,7 +508,7 @@ pub fn do_codemod(
 
     // Handle apply_fix case separately since it needs to filter diagnostics anyway
     if args.apply_fix {
-        if diagnostics_config.enabled.all_enabled() {
+        if diagnostics_config.diagnostic_filter.is_none() {
             bail!(
                 "We cannot apply fixes if all diagnostics enabled. Perhaps provide --diagnostic-filter"
             );
@@ -1472,7 +1464,6 @@ mod tests {
     use elp::build::fixture;
     use elp::cli::Fake;
     use elp_ide::FunctionMatch;
-    use elp_ide::diagnostics::DiagnosticCode;
     use elp_ide::diagnostics::ErlangServiceConfig;
     use elp_ide::diagnostics::Lint;
     use elp_ide::diagnostics::LintsFromConfig;
@@ -1486,7 +1477,6 @@ mod tests {
 
     use super::LintConfig;
     use super::do_codemod;
-    use super::get_and_report_diagnostics_config;
     use crate::args;
     use crate::args::Command;
 
@@ -1505,8 +1495,6 @@ mod tests {
                     action: ReplaceCallAction::Replace(Replacement::UseOk),
                 })],
             },
-            enabled_lints: vec![DiagnosticCode::HeadMismatch],
-            disabled_lints: vec![],
             linters: FxHashMap::default(),
             erlang_service: ErlangServiceConfig {
                 warnings_as_errors: true,
@@ -1515,9 +1503,6 @@ mod tests {
         .unwrap();
 
         expect![[r#"
-            enabled_lints = ["P1700"]
-            disabled_lints = []
-
             [erlang_service]
             warnings_as_errors = true
 
@@ -1541,26 +1526,41 @@ mod tests {
     #[test]
     fn serde_deserialize_lint_config() {
         let lint_config: LintConfig = toml::from_str(
-            r#"enabled_lints =['W0014', 'trivial_match']
-               disabled_lints = []
+            r#"[linters.cross_node_eval]
+               enabled = true
              "#,
         )
         .unwrap();
 
         expect![[r#"
             LintConfig {
-                enabled_lints: [
-                    CrossNodeEval,
-                    TrivialMatch,
-                ],
-                disabled_lints: [],
                 erlang_service: ErlangServiceConfig {
                     warnings_as_errors: false,
                 },
                 ad_hoc_lints: LintsFromConfig {
                     lints: [],
                 },
-                linters: {},
+                linters: {
+                    CrossNodeEval: LinterConfig {
+                        is_enabled: Some(
+                            true,
+                        ),
+                        severity: None,
+                        include_tests: None,
+                        include_generated: None,
+                        experimental: None,
+                        exclude_apps: None,
+                        runs_on_save_only: None,
+                        config: Some(
+                            FunctionCallLinterConfig(
+                                FunctionCallLinterConfig {
+                                    include: None,
+                                    exclude: None,
+                                },
+                            ),
+                        ),
+                    },
+                },
             }
         "#]]
         .assert_debug_eq(&lint_config);
@@ -1583,7 +1583,7 @@ mod tests {
 
         if let Command::Lint(mut lint) = args.command {
             lint.normalize();
-            let diagnostics_config = get_and_report_diagnostics_config(&lint, &mut cli).unwrap();
+            let diagnostics_config = super::get_diagnostics_config(&lint).unwrap();
 
             do_codemod(&mut cli, &mut loaded, &diagnostics_config, &lint).ok();
             let (stdout, stderr) = cli.to_strings();

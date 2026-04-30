@@ -192,8 +192,6 @@ mod tests {
     #[test]
     fn serde_serialize_lint_config() {
         let lint_config = LintConfig {
-            enabled_lints: vec![DiagnosticCode::ApplicationGetEnv],
-            disabled_lints: vec![],
             ad_hoc_lints: LintsFromConfig {
                 lints: vec![
                     Lint::ReplaceCall(ReplaceCall {
@@ -218,9 +216,6 @@ mod tests {
             erlang_service: ErlangServiceConfig::default(),
         };
         expect![[r#"
-            enabled_lints = ["W0011"]
-            disabled_lints = []
-
             [erlang_service]
             warnings_as_errors = false
             
@@ -255,16 +250,6 @@ mod tests {
             [linters]
         "#]]
         .assert_eq(&toml::to_string::<LintConfig>(&lint_config).unwrap());
-    }
-
-    #[test]
-    fn serde_read_lint_config_empty_enabled() {
-        let content = r#"
-            disabled_lints = []
-            "#;
-        let config = toml::from_str::<LintConfig>(content).unwrap();
-        assert_eq!(config.enabled_lints, vec![]);
-        assert_eq!(config.disabled_lints, vec![]);
     }
 
     #[test]

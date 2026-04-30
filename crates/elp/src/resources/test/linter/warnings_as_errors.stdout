@@ -1,6 +1,5 @@
         7:1-7:5: Mismatched clause name
 Diagnostics reported:
-Reporting all diagnostics codes
 app_a/src/app_a.erl:12:1-12:4::[Error] [L1230] function bar/0 is unused
 app_a/src/app_a.erl:13:5-13:14::[Warning] [W0026] Function 'app_a:baz/2' is not exported.
 app_a/src/app_a.erl:16:1-16:4::[Error] [L1230] function baz/2 is unused

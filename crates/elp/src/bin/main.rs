@@ -1338,13 +1338,7 @@ mod tests {
             .buck(buck)
             .sorted()
             .check_lint_fix(
-                args_vec![
-                    "lint",
-                    "--diagnostic-filter",
-                    "W0010",
-                    "--experimental",
-                    "--read-config"
-                ],
+                args_vec!["lint", "--experimental", "--read-config"],
                 "linter",
                 resource_file!("linter/parse_elp_lint_config_output.stdout"),
                 None,
@@ -1417,6 +1411,8 @@ mod tests {
                     "--module",
                     "app_b",
                     "--apply-fix",
+                    "--diagnostic-filter",
+                    "ad-hoc: application:get_env/2",
                     "--one-shot",
                     "--to",
                     tmp_path,
@@ -1478,11 +1474,11 @@ mod tests {
                 "linter_bad_config",
                 resource_file!("linter/parse_elp_lint_bad_config_output.stdout"),
                 Some(expect![[r#"
-                    failed to read "{project_path}/.elp_lint.toml":TOML parse error at line 6, column 4
+                    failed to read "{project_path}/.elp_lint.toml":TOML parse error at line 2, column 9
                       |
-                    6 |    syntax error
-                      |    ^
-                    missing comma between array elements, expected `,`
+                    2 | [linters
+                      |         ^
+                    unclosed table, expected `]`
 
                 "#]]),
             )
@@ -1927,6 +1923,8 @@ mod tests {
         simple_snapshot_sorted(
             args_vec![
                 "lint",
+                "--diagnostic-filter",
+                "ad-hoc: ssr-match",
                 "--config-file",
                 project_path("linter/elp_lint_ssr_adhoc.toml"),
             ],
@@ -1941,7 +1939,14 @@ mod tests {
     fn lint_ssr_from_bad_config() {
         let config_file = project_path("linter/elp_lint_ssr_adhoc_parse_fail.toml");
         simple_snapshot_expect_stderror(
-            args_vec!["lint", "--config-file", &config_file, "--experimental"],
+            args_vec![
+                "lint",
+                "--config-file",
+                &config_file,
+                "--experimental",
+                "--diagnostic-filter",
+                "ad-hoc: ssr-match",
+            ],
             "linter",
             resource_file!("linter/ssr_ad_hoc_parse_fail.stdout"),
             false,
