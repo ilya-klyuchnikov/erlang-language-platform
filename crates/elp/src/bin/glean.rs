@@ -521,8 +521,9 @@ impl GleanIndexer {
         let exdoc_link: Option<String> = None; // @oss-only
 
         let def_map = db.def_map(file_id);
+        let def_map_local = db.def_map_local(file_id);
 
-        let all_macros: Vec<types::MacroInfo> = def_map
+        let all_macros: Vec<types::MacroInfo> = def_map_local
             .get_macros()
             .iter()
             .map(|(mn, macro_def)| {
