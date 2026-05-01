@@ -714,12 +714,14 @@ impl GleanIndexer {
                                 .as_ref()
                                 .map_or(String::new(), |e| format!("\n---\n\n{}", e))
                         );
+                        let def_span: Location = range.into();
                         let decl = Declaration::MacroDeclaration(
                             MacroDecl {
                                 name: x.key.name.clone(),
                                 v1_fake_arity: Some(xref.source.start),
-                                span: xref.source.clone(),
+                                v1_span: xref.source.clone(),
                                 arity: x.key.arity,
+                                span: def_span.clone(),
                             }
                             .into(),
                         );
@@ -768,10 +770,12 @@ impl GleanIndexer {
                                 .collect();
 
                             let doc = format!("{}{}", links_section, text);
+                            let def_span: Location = range.into();
                             let decl = Declaration::RecordDeclaration(
                                 RecordDecl {
                                     name: x.key.name.clone(),
-                                    span: xref.source.clone(),
+                                    v1_span: xref.source.clone(),
+                                    span: def_span.clone(),
                                 }
                                 .into(),
                             );
@@ -937,13 +941,14 @@ impl GleanIndexer {
 
         for (macros, def) in def_map.get_macros() {
             let range = def.source(db).syntax().text_range();
-            let span = range.into();
+            let span: Location = range.into();
             let decl = Declaration::MacroDeclaration(
                 MacroDecl {
                     name: macros.name().to_string(),
                     v1_fake_arity: macros.arity(),
-                    span,
+                    v1_span: span.clone(),
                     arity: macros.arity(),
+                    span,
                 }
                 .into(),
             );
@@ -991,6 +996,7 @@ impl GleanIndexer {
             let decl = Declaration::RecordDeclaration(
                 RecordDecl {
                     name: rec.to_string(),
+                    v1_span: span.clone(),
                     span: span.clone(),
                 }
                 .into(),

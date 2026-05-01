@@ -461,9 +461,12 @@ pub(crate) struct MacroDecl {
     pub(crate) name: String,
     #[serde(rename = "arity", skip_serializing_if = "Option::is_none")]
     pub(crate) v1_fake_arity: Option<u32>,
-    pub(crate) span: Location,
+    #[serde(rename = "span")]
+    pub(crate) v1_span: Location,
     #[serde(skip)]
     pub(crate) arity: Option<u32>,
+    #[serde(skip)]
+    pub(crate) span: Location,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -481,6 +484,9 @@ pub(crate) struct TypeDecl {
 #[derive(Serialize, Debug, Clone)]
 pub(crate) struct RecordDecl {
     pub(crate) name: String,
+    #[serde(rename = "span")]
+    pub(crate) v1_span: Location,
+    #[serde(skip)]
     pub(crate) span: Location,
 }
 

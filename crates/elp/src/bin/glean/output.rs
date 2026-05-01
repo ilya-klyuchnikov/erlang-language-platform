@@ -162,7 +162,7 @@ impl IndexedFacts {
                 FunctionDeclarationFact {
                     file_id,
                     fqn,
-                    span: d.key.span,
+                    span: d.key.v1_span,
                 }
             }
             Declaration::TypeDeclaration(d) => {
@@ -188,7 +188,7 @@ impl IndexedFacts {
                 FunctionDeclarationFact {
                     file_id,
                     fqn,
-                    span: d.key.span,
+                    span: d.key.v1_span,
                 }
             }
             Declaration::HeaderDeclaration(d) => {
