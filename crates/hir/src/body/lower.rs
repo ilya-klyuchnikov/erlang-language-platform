@@ -1062,16 +1062,17 @@ impl<'a> Ctx<'a> {
             }
             ast::Expr::Dotdotdot(_) => self.alloc_expr(Expr::Missing, Some(expr)),
             ast::Expr::MapExpr(map) => {
+                // Keep both `=>` (Assoc) and `:=` (Exact) fields. While `:=` is
+                // only valid in patterns in standard Erlang, a map literal can
+                // appear as a macro argument where the eventual context is
+                // unknown, and dropping `:=` fields makes their inner
+                // expressions unreachable for folds (e.g. SSR matching).
                 let fields = map
                     .fields()
-                    .flat_map(|field| {
+                    .map(|field| {
                         let key = self.lower_optional_expr(field.key());
                         let value = self.lower_optional_expr(field.value());
-                        if let Some((ast::MapOp::Assoc, _)) = field.op() {
-                            Some((key, value))
-                        } else {
-                            None
-                        }
+                        (key, value)
                     })
                     .collect();
                 self.alloc_expr(Expr::Map { fields }, Some(expr))

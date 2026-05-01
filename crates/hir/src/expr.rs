@@ -258,6 +258,10 @@ pub enum Expr {
     Missing,
     Literal(Literal),
     Var(Var),
+    /// Lhs is a pattern, rhs is an expression. In an `Expr::MacroCall.args`
+    /// context, this can also represent the alias-pattern shape `Pat = Pat`
+    /// since macro args are always lowered as expressions, but can be
+    /// substituted into a pattern position by the macro body.
     Match {
         lhs: PatId,
         rhs: ExprId,
@@ -313,6 +317,13 @@ pub enum Expr {
         name: NativeRecordName,
         field: Atom,
     },
+    /// In pure expression context, only `=>` (Assoc) fields are valid Erlang.
+    /// We also keep `:=` (Exact) fields here so that map shapes appearing in
+    /// `Expr::MacroCall.args` (e.g. `?assertMatch(#{key := V}, _)`) preserve
+    /// their inner expressions, which would otherwise be unreachable from
+    /// folds (e.g. SSR pattern matching). The op is intentionally not stored
+    /// since it is not meaningful in expression position. See `Pat::Map` for
+    /// the pattern-context counterpart.
     Map {
         fields: Vec<(ExprId, ExprId)>,
     },

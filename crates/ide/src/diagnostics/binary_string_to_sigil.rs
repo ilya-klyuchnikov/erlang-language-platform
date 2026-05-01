@@ -240,4 +240,30 @@ mod tests {
             "#]],
         )
     }
+
+    // T259230183: W0051 must fire inside a map inside a macro argument.
+    // The `:=` map field used to be dropped during HIR lowering for `Expr::Map`,
+    // hiding `<<"foo">>` from the SSR fold.
+    #[test]
+    fn detects_binary_string_in_map_in_assert_match() {
+        check_diagnostics(
+            r#"
+         //- /assert/include/assert.hrl app:assert include_path:/assert/include
+         -define(assertMatch(Guard, Expr),
+             ((fun () ->
+                 case (Expr) of
+                     Guard -> ok;
+                     _ -> erlang:error({assertMatch_failed})
+                 end
+              end)())).
+
+         //- /src/test.erl app:test
+         -module(test).
+         -include_lib("assert/include/assert.hrl").
+         fn(Bar) ->
+             ?assertMatch(#{key := <<"foo">>}, Bar).
+         %%                        ^^^^^^^^^ 💡 weak: W0051: Binary string can be written using sigil syntax.
+            "#,
+        )
+    }
 }

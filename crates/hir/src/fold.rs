@@ -3001,4 +3001,163 @@ bar() ->
                "#;
         count_atom_foo(fixture_str, 3);
     }
+
+    // -----------------------------------------------------------------
+    // Structural-superset invariant for macro args.
+    //
+    // With `MacroStrategy::DoNotExpand`, `Expr::MacroCall.args` is the only
+    // path the fold takes through a macro call. Macro args are always
+    // lowered as `Expr` regardless of the eventual context inside the
+    // macro body, so `Expr` lowering must be a structural superset of
+    // `Pat` lowering: every leaf reachable through `Pat` lowering of a
+    // shape S must also be reachable through `Expr` lowering of S.
+    //
+    // These tests embed pat-position shapes (containing the marker atom
+    // `foo`) inside a macro arg, fold the result with `DoNotExpand`, and
+    // assert that all `foo` leaves remain reachable. They guard against
+    // regressions like T259230183 where `Expr::Map` silently dropped `:=`
+    // fields, hiding their inner expressions.
+    //
+    // Each fixture has an extra top-level marker (the module attribute or
+    // a `~` anchor on the test's atom) that contributes one `foo` to the
+    // count — the per-shape comments call out the rest.
+
+    #[track_caller]
+    fn count_macro_args_foo_surface(fixture_str: &str, expected: u32) {
+        count_atom_foo_with_strategy(
+            Strategy {
+                macros: MacroStrategy::DoNotExpand,
+                parens: ParenStrategy::InvisibleParens,
+            },
+            fixture_str,
+            expected,
+        )
+    }
+
+    #[test]
+    fn macro_args_superset_bare_atom() {
+        // baseline: bare atom in a macro arg is reachable.
+        // foo: module(1) + macro arg(1) = 2
+        let fixture_str = r#"
+               -module(f~oo).
+               -define(M(X), X).
+               bar() -> ?M(foo).
+               "#;
+        count_macro_args_foo_surface(fixture_str, 2);
+    }
+
+    #[test]
+    fn macro_args_superset_tuple() {
+        // tuple shape is the same in pat/expr context.
+        // foo: module(1) + tuple elements(2) = 3
+        let fixture_str = r#"
+               -module(f~oo).
+               -define(M(X), X).
+               bar() -> ?M({foo, foo}).
+               "#;
+        count_macro_args_foo_surface(fixture_str, 3);
+    }
+
+    #[test]
+    fn macro_args_superset_list_cons() {
+        // list cons shape is the same in pat/expr context.
+        // foo: module(1) + head(1) + tail(1) = 3
+        let fixture_str = r#"
+               -module(f~oo).
+               -define(M(X), X).
+               bar() -> ?M([foo | foo]).
+               "#;
+        count_macro_args_foo_surface(fixture_str, 3);
+    }
+
+    #[test]
+    fn macro_args_superset_map_assoc() {
+        // map with `=>` (only valid op in pure expression context).
+        // foo: module(1) + map key(1) + map value(1) = 3
+        let fixture_str = r#"
+               -module(f~oo).
+               -define(M(X), X).
+               bar() -> ?M(#{foo => foo}).
+               "#;
+        count_macro_args_foo_surface(fixture_str, 3);
+    }
+
+    #[test]
+    fn macro_args_superset_map_exact() {
+        // T259230183: map with `:=` is the canonical regression case.
+        // `:=` is invalid in pure expression Erlang, but valid as a map
+        // pattern; macro args must preserve it so the inner leaves remain
+        // reachable.
+        // foo: module(1) + map key(1) + map value(1) = 3
+        let fixture_str = r#"
+               -module(f~oo).
+               -define(M(X), X).
+               bar() -> ?M(#{foo := foo}).
+               "#;
+        count_macro_args_foo_surface(fixture_str, 3);
+    }
+
+    #[test]
+    fn macro_args_superset_map_mixed_ops() {
+        // Both `=>` and `:=` keys in the same map literal.
+        // foo: module(1) + 2 keys(2) + 2 values(2) = 5
+        let fixture_str = r#"
+               -module(f~oo).
+               -define(M(X), X).
+               bar() -> ?M(#{foo => foo, foo := foo}).
+               "#;
+        count_macro_args_foo_surface(fixture_str, 5);
+    }
+
+    #[test]
+    fn macro_args_superset_match() {
+        // `=` shape: alias-pattern in pat context, assignment in expr
+        // context. Either way both sides must be reachable.
+        // foo: module(1) + lhs(1) + rhs(1) = 3
+        let fixture_str = r#"
+               -module(f~oo).
+               -define(M(X), X).
+               bar() -> ?M(foo = foo).
+               "#;
+        count_macro_args_foo_surface(fixture_str, 3);
+    }
+
+    #[test]
+    fn macro_args_superset_record() {
+        // Record literal: same shape in pat/expr context.
+        // foo: module(1) + record field value(1) = 2
+        let fixture_str = r#"
+               -module(f~oo).
+               -define(M(X), X).
+               -record(r, {f}).
+               bar() -> ?M(#r{f = foo}).
+               "#;
+        count_macro_args_foo_surface(fixture_str, 2);
+    }
+
+    #[test]
+    fn macro_args_superset_binary() {
+        // Binary segment: same shape in pat/expr context.
+        // foo: module(1) + binary segment(1) = 2
+        let fixture_str = r#"
+               -module(f~oo).
+               -define(M(X), X).
+               bar() -> ?M(<<foo:8>>).
+               "#;
+        count_macro_args_foo_surface(fixture_str, 2);
+    }
+
+    #[test]
+    fn macro_args_superset_nested_map_in_tuple() {
+        // The original T259230183 shape: map with `:=` nested inside
+        // another container, all inside a macro arg. Mirrors
+        // `?assertMatch(#{key := <<...>>}, _)`.
+        // foo: module(1) + map key(1) + map value(1) = 3
+        let fixture_str = r#"
+               -module(f~oo).
+               -define(M(Guard, _Expr), Guard).
+               bar(Bar) -> ?M(#{foo := foo}, Bar).
+               "#;
+        count_macro_args_foo_surface(fixture_str, 3);
+    }
 }
