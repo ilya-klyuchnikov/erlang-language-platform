@@ -905,7 +905,7 @@ pub(crate) fn xref_check(spec: &str) {
         for xref in xref_fact.xrefs {
             let range: TextRange = xref.source.clone().into();
             let file_name = file_names
-                .get(xref.target.file_id())
+                .get(xref.target.v1_file_id())
                 .expect("must be present");
             let label = xref.target.to_string();
             if label.is_empty() {
@@ -1098,7 +1098,7 @@ impl fmt::Display for XRefTarget {
                 f.write_str(format!("func/{}/{}", xref.key.name, xref.key.arity).as_str())
             }
             XRefTarget::Macro(xref) => {
-                let arity = match &xref.key.arity {
+                let arity = match &xref.key.v1_arity {
                     Some(arity) => arity.to_string(),
                     None => "no_arity".to_string(),
                 };

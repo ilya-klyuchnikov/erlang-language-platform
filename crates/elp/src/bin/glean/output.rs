@@ -156,7 +156,7 @@ impl IndexedFacts {
                 let fqn = MFA {
                     module,
                     name: d.key.name,
-                    arity: d.key.arity.unwrap_or(0),
+                    arity: d.key.v1_fake_arity.unwrap_or(0),
                     file_id: file_id.clone(),
                 };
                 FunctionDeclarationFact {
@@ -236,6 +236,9 @@ impl IndexedFacts {
                 for d in decl.declarations {
                     let file_id = decl.file_id.clone();
                     if let Declaration::DocDeclaration(doc) = &d {
+                        if doc.key.v1_skip {
+                            continue;
+                        }
                         let declaration = doc.key.target.as_ref();
                         if let Some(target) = Self::declaration_to_fact(
                             declaration.clone(),
@@ -272,7 +275,7 @@ impl IndexedFacts {
             for xref in fact.xrefs {
                 xref_count += 1;
                 let source = xref.source;
-                let file_id = xref.target.file_id();
+                let file_id = xref.target.v1_file_id();
                 if let Some(module) = modules.get(file_id) {
                     let target = match xref.target {
                         XRefTarget::Function(x) => MFA {
@@ -284,8 +287,8 @@ impl IndexedFacts {
                         XRefTarget::Macro(x) => MFA {
                             module: module.clone(),
                             name: x.key.name,
-                            arity: x.key.arity.unwrap_or(0),
-                            file_id: x.key.file_id,
+                            arity: x.key.v1_arity.unwrap_or(0),
+                            file_id: x.key.v1_file_id,
                         },
                         XRefTarget::Header(x) => MFA {
                             module: module.clone(),
@@ -297,7 +300,7 @@ impl IndexedFacts {
                             module: module.clone(),
                             name: x.key.name,
                             arity: REC_ARITY,
-                            file_id: x.key.file_id,
+                            file_id: x.key.v1_file_id,
                         },
                         XRefTarget::Type(x) => MFA {
                             module: module.clone(),

@@ -317,6 +317,17 @@ impl XRefTarget {
             XRefTarget::Var(xref) => &xref.key.file_id,
         }
     }
+
+    pub(crate) fn v1_file_id(&self) -> &GleanFileId {
+        match self {
+            XRefTarget::Function(xref) => &xref.key.file_id,
+            XRefTarget::Macro(xref) => &xref.key.v1_file_id,
+            XRefTarget::Header(xref) => &xref.key.file_id,
+            XRefTarget::Record(xref) => &xref.key.v1_file_id,
+            XRefTarget::Type(xref) => &xref.key.file_id,
+            XRefTarget::Var(xref) => &xref.key.file_id,
+        }
+    }
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -337,9 +348,13 @@ pub(crate) struct TaggedUrl {
 #[derive(Serialize, Debug, Clone)]
 pub(crate) struct MacroTarget {
     #[serde(rename = "file")]
-    pub(crate) file_id: GleanFileId,
+    pub(crate) v1_file_id: GleanFileId,
     pub(crate) name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "arity", skip_serializing_if = "Option::is_none")]
+    pub(crate) v1_arity: Option<u32>,
+    #[serde(skip)]
+    pub(crate) file_id: GleanFileId,
+    #[serde(skip)]
     pub(crate) arity: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) expansion: Option<String>,
@@ -357,8 +372,10 @@ pub(crate) struct HeaderTarget {
 #[derive(Serialize, Debug, Clone)]
 pub(crate) struct RecordTarget {
     #[serde(rename = "file")]
-    pub(crate) file_id: GleanFileId,
+    pub(crate) v1_file_id: GleanFileId,
     pub(crate) name: String,
+    #[serde(skip)]
+    pub(crate) file_id: GleanFileId,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) tagged_urls: Vec<TaggedUrl>,
 }
@@ -442,9 +459,11 @@ pub(crate) struct FuncDecl {
 #[derive(Serialize, Debug, Clone)]
 pub(crate) struct MacroDecl {
     pub(crate) name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) arity: Option<u32>,
+    #[serde(rename = "arity", skip_serializing_if = "Option::is_none")]
+    pub(crate) v1_fake_arity: Option<u32>,
     pub(crate) span: Location,
+    #[serde(skip)]
+    pub(crate) arity: Option<u32>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -484,6 +503,8 @@ pub(crate) struct DocDecl {
     pub(crate) target: Box<Declaration>,
     pub(crate) span: Location,
     pub(crate) text: String,
+    #[serde(skip)]
+    pub(crate) v1_skip: bool,
 }
 
 // ── erlang.2 output types ──────────────────────────────────────────

@@ -717,8 +717,9 @@ impl GleanIndexer {
                         let decl = Declaration::MacroDeclaration(
                             MacroDecl {
                                 name: x.key.name.clone(),
-                                arity: Some(xref.source.start),
+                                v1_fake_arity: Some(xref.source.start),
                                 span: xref.source.clone(),
+                                arity: x.key.arity,
                             }
                             .into(),
                         );
@@ -727,16 +728,17 @@ impl GleanIndexer {
                                 target: Box::new(decl.clone()),
                                 span: xref.source.clone(),
                                 text: doc,
+                                v1_skip: false,
                             }
                             .into(),
                         );
                         file_decl.declarations.push(decl);
                         file_decl.declarations.push(doc_decl);
-                        x.key.file_id = file_id.into();
+                        x.key.v1_file_id = file_id.into();
                         // @fb-only: Using xref.source.start as arity is a
                         // @fb-only: design choice - see D55916496. This should
                         // @fb-only: be revisited during Glean schema redesign.
-                        x.key.arity = Some(xref.source.start);
+                        x.key.v1_arity = Some(xref.source.start);
                     }
                 }
                 XRefTarget::Record(x) => {
@@ -778,12 +780,13 @@ impl GleanIndexer {
                                     target: Box::new(decl.clone()),
                                     span: xref.source.clone(),
                                     text: doc,
+                                    v1_skip: false,
                                 }
                                 .into(),
                             );
                             file_decl.declarations.push(decl);
                             file_decl.declarations.push(doc_decl);
-                            x.key.file_id = file_id.into();
+                            x.key.v1_file_id = file_id.into();
                         }
                     }
                 }
@@ -806,6 +809,7 @@ impl GleanIndexer {
                     target: Box::new(decl.clone()),
                     span,
                     text: doc,
+                    v1_skip: false,
                 }
                 .into(),
             );
@@ -893,6 +897,7 @@ impl GleanIndexer {
                             target: Box::new(decl.clone()),
                             span: doc_range.into(),
                             text: doc,
+                            v1_skip: false,
                         }
                         .into(),
                     ));
@@ -907,6 +912,7 @@ impl GleanIndexer {
                             target: Box::new(decl.clone()),
                             span: doc_range.into(),
                             text,
+                            v1_skip: true,
                         }
                         .into(),
                     ));
@@ -920,6 +926,7 @@ impl GleanIndexer {
                             target: Box::new(decl.clone()),
                             span,
                             text: markdown,
+                            v1_skip: true,
                         }
                         .into(),
                     ));
@@ -934,8 +941,9 @@ impl GleanIndexer {
             let decl = Declaration::MacroDeclaration(
                 MacroDecl {
                     name: macros.name().to_string(),
-                    arity: macros.arity(),
+                    v1_fake_arity: macros.arity(),
                     span,
+                    arity: macros.arity(),
                 }
                 .into(),
             );
@@ -967,6 +975,7 @@ impl GleanIndexer {
                     target: Box::new(decl.clone()),
                     span,
                     text,
+                    v1_skip: false,
                 }
                 .into(),
             ));
@@ -992,6 +1001,7 @@ impl GleanIndexer {
                     target: Box::new(decl.clone()),
                     span,
                     text,
+                    v1_skip: false,
                 }
                 .into(),
             ));
@@ -1363,10 +1373,14 @@ impl GleanIndexer {
         let define = &form_list[macro_def.value];
         let name = define.name.name();
         let expansion = Self::expand_macro(sema, &expr_source, source_file);
+        let arity = define.name.arity();
+        let file_id: GleanFileId = macro_def.file_id.into();
         let target = MacroTarget {
-            file_id: macro_def.file_id.into(),
+            v1_file_id: file_id.clone(),
             name: name.to_string(),
-            arity: define.name.arity(),
+            v1_arity: arity,
+            file_id,
+            arity,
             expansion,
             tagged_urls: Vec::new(),
         };
@@ -1435,8 +1449,9 @@ impl GleanIndexer {
             source: range.into(),
             target: XRefTarget::Record(
                 RecordTarget {
-                    file_id: def.file.file_id.into(),
+                    v1_file_id: def.file.file_id.into(),
                     name: def.record.name.to_string(),
+                    file_id: def.file.file_id.into(),
                     tagged_urls,
                 }
                 .into(),
