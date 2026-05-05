@@ -326,6 +326,13 @@ lists_member_4_neg(Atom) ->
     _ -> <<>>
   end.
 
+-spec lists_member_4(atom(), [atom() | binary()]) -> atom().
+lists_member_4(Atom, List) ->
+  case lists:member(Atom, List) of
+    true -> Atom;
+    _ -> error(bad_arg)
+  end.
+
 -spec parse_atom(binary(), [A]) -> A.
 parse_atom(Bin, Atoms) ->
   Atom = binary_to_existing_atom(Bin),

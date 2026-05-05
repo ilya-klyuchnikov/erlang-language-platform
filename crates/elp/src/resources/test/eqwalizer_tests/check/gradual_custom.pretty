@@ -365,9 +365,25 @@ Because in the expression's type:
   Differs from the expected type:  'foo' | 'bar' | binary()
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/gradual_custom.erl:343:3
+    ┌─ check/src/gradual_custom.erl:332:13
     │
-343 │   parse_atom(Bin, [foo, bar]).
+332 │     true -> Atom;
+    │             ^^^^
+    │             │
+    │             Atom.
+Expression has type:   atom() | binary()
+Context expected type: atom()
+    │             
+
+Because in the expression's type:
+  Here the type is a union type with some valid candidates: atom()
+  However the following candidate: binary()
+  Differs from the expected type:  atom()
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/gradual_custom.erl:350:3
+    │
+350 │   parse_atom(Bin, [foo, bar]).
     │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │   │
     │   parse_atom(Bin, ['foo', 'bar']).
@@ -380,4 +396,4 @@ Because in the expression's type:
   However the following candidate: 'bar'
   Differs from the expected type:  'foo'
 
-37 ERRORS
+38 ERRORS
