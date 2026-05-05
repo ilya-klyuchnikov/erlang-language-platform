@@ -1086,10 +1086,15 @@ impl GleanIndexer {
             | hir::AnyExpr::Pat(Pat::RecordIndex { name, .. })
             | hir::AnyExpr::TypeExpr(TypeExpr::Record { name, .. })
             | hir::AnyExpr::Expr(Expr::Record { name, .. })
-            | hir::AnyExpr::Expr(Expr::RecordIndex { name, .. })
             | hir::AnyExpr::Expr(Expr::RecordUpdate { name, .. })
+            | hir::AnyExpr::Expr(Expr::RecordIndex { name, .. })
             | hir::AnyExpr::Expr(Expr::RecordField { name, .. }) => {
-                Self::resolve_record(sema, *name, file_id, ctx)
+                if let Some(record_xref) = Self::resolve_record(sema, *name, file_id, ctx) {
+                    Self::resolve_record_fields(sema, *name, file_id, source_file, ctx, acc);
+                    Some(record_xref)
+                } else {
+                    None
+                }
             }
             hir::AnyExpr::Expr(Expr::MacroCall {
                 macro_def,
@@ -1435,16 +1440,26 @@ impl GleanIndexer {
         })
     }
 
+    fn lookup_record(
+        sema: &Semantic,
+        name: hir::Atom,
+        file_id: FileId,
+        ctx: &AnyCallBackCtx,
+    ) -> Option<(hir::RecordDef, ExprSource)> {
+        let record_name = name.as_name();
+        let def_map = sema.db.def_map(file_id);
+        let def = def_map.get_record(&record_name)?.clone();
+        let (_, _, expr_source) = ctx.body_with_expr_source(sema)?;
+        Some((def, expr_source))
+    }
+
     fn resolve_record(
         sema: &Semantic,
         name: hir::Atom,
         file_id: FileId,
         ctx: &AnyCallBackCtx,
     ) -> Option<XRef> {
-        let record_name = name.as_name();
-        let def_map = sema.db.def_map(file_id);
-        let def = def_map.get_record(&record_name)?;
-        let (_, _, expr_source) = ctx.body_with_expr_source(sema)?;
+        let (def, expr_source) = Self::lookup_record(sema, name, file_id, ctx)?;
         let source_file = sema.parse(file_id);
         let range = Self::find_range(sema, ctx, &source_file, &expr_source)?;
 
@@ -1464,6 +1479,84 @@ impl GleanIndexer {
             ),
             caller: None,
         })
+    }
+
+    fn resolve_record_context(
+        sema: &Semantic,
+        name: hir::Atom,
+        file_id: FileId,
+        source_file: &InFile<ast::SourceFile>,
+        ctx: &AnyCallBackCtx,
+    ) -> Option<(hir::RecordDef, ast::Expr)> {
+        let (def, expr_source) = Self::lookup_record(sema, name, file_id, ctx)?;
+        let node = expr_source.to_node(source_file)?;
+        Some((def, node))
+    }
+
+    fn resolve_record_fields(
+        sema: &Semantic,
+        name: hir::Atom,
+        file_id: FileId,
+        source_file: &InFile<ast::SourceFile>,
+        ctx: &AnyCallBackCtx,
+        acc: &mut Vec<XRef>,
+    ) {
+        let (def, node) = match Self::resolve_record_context(sema, name, file_id, source_file, ctx)
+        {
+            Some(t) => t,
+            None => return,
+        };
+        let record_name_str = name.as_name().to_string();
+        let target_file_id: GleanFileId = def.file.file_id.into();
+
+        let fields: Vec<(String, TextRange)> = match &node {
+            ast::Expr::RecordExpr(e) => e
+                .fields()
+                .filter_map(|f| {
+                    let n = f.name()?;
+                    Some((n.syntax().text().to_string(), n.syntax().text_range()))
+                })
+                .collect(),
+            ast::Expr::RecordUpdateExpr(e) => e
+                .fields()
+                .filter_map(|f| {
+                    let n = f.name()?;
+                    Some((n.syntax().text().to_string(), n.syntax().text_range()))
+                })
+                .collect(),
+            ast::Expr::RecordFieldExpr(e) => e
+                .field()
+                .map(|f| {
+                    let text = f.syntax().text().to_string();
+                    let name = text.strip_prefix('.').unwrap_or(&text).to_string();
+                    vec![(name, f.syntax().text_range())]
+                })
+                .unwrap_or_default(),
+            ast::Expr::RecordIndexExpr(e) => e
+                .field()
+                .map(|f| {
+                    let text = f.syntax().text().to_string();
+                    let name = text.strip_prefix('.').unwrap_or(&text).to_string();
+                    vec![(name, f.syntax().text_range())]
+                })
+                .unwrap_or_default(),
+            _ => return,
+        };
+
+        for (field_name, range) in fields {
+            acc.push(XRef {
+                source: range.into(),
+                target: XRefTarget::RecordField(
+                    types::RecordFieldTarget {
+                        file_id: target_file_id.clone(),
+                        record_name: record_name_str.clone(),
+                        field_name,
+                    }
+                    .into(),
+                ),
+                caller: None,
+            });
+        }
     }
 
     fn find_range(

@@ -369,6 +369,43 @@ fn declaration_in_header_test() {
 }
 
 #[test]
+fn record_field_xref_multifield_test() {
+    let spec = r#"
+    //- /glean/app_glean/src/glean_module_rf.erl
+    -module(glean_module_rf).
+    -record(state, {name, age}).
+    baz() -> #state{name = a, age = 1}.
+    "#;
+    let (facts, _, file_names, _, _) = facts_with_annotations(spec);
+    let mut xref_labels: Vec<String> = vec![];
+    for xref_fact in facts.xrefs {
+        for xref in xref_fact.xrefs {
+            let file_name = file_names
+                .get(xref.target.file_id())
+                .unwrap_or(&"?".to_string())
+                .clone();
+            let label = xref.target.to_string();
+            if !label.is_empty() {
+                xref_labels.push(format!("{file_name}/{label}"));
+            }
+        }
+    }
+    xref_labels.sort();
+    assert!(
+        xref_labels.contains(&"glean_module_rf.erl/rec/state/no_urls".to_string()),
+        "Expected record xref, got: {xref_labels:?}"
+    );
+    assert!(
+        xref_labels.contains(&"glean_module_rf.erl/rec_field/state/name".to_string()),
+        "Expected record_field name xref, got: {xref_labels:?}"
+    );
+    assert!(
+        xref_labels.contains(&"glean_module_rf.erl/rec_field/state/age".to_string()),
+        "Expected record_field age xref, got: {xref_labels:?}"
+    );
+}
+
+#[test]
 fn xref_call_test() {
     let spec = r#"
     //- /glean/app_glean/src/glean_module61.erl
@@ -503,6 +540,7 @@ fn xref_record_test() {
     baz(A) ->
         #query{ size = A }.
     %%  ^^^^^^ glean_module9.erl/rec/query/no_urls
+    %%          ^^^^ glean_module9.erl/rec_field/query/size
     "#;
 
     xref_check(spec);
@@ -516,8 +554,10 @@ fn xref_record_index_test() {
     baz(Time) ->
         [{#stats.count, 1},
     %%    ^^^^^^ glean_module10.erl/rec/stats/no_urls
+    %%          ^^^^^^ glean_module10.erl/rec_field/stats/count
         {#stats.time, Time}].
     %%   ^^^^^^ glean_module10.erl/rec/stats/no_urls
+    %%         ^^^^^ glean_module10.erl/rec_field/stats/time
 
     "#;
 
@@ -532,6 +572,7 @@ fn xref_record_field_test() {
     baz(Stats) ->
         Stats#stats.count.
     %%       ^^^^^^ glean_module11.erl/rec/stats/no_urls
+    %%             ^^^^^^ glean_module11.erl/rec_field/stats/count
     "#;
 
     xref_check(spec);
@@ -545,6 +586,7 @@ fn xref_record_update_test() {
     baz(Stats, NewCnt) ->
         Stats#stats{count = NewCnt}.
     %%       ^^^^^^ glean_module12.erl/rec/stats/no_urls
+    %%              ^^^^^ glean_module12.erl/rec_field/stats/count
     "#;
 
     xref_check(spec);
@@ -558,6 +600,8 @@ fn xref_pat_record_test() {
     baz(Stats) ->
         #stats{count = Count, time = Time} = Stats.
     %%  ^^^^^^ glean_module13.erl/rec/stats/no_urls
+    %%         ^^^^^ glean_module13.erl/rec_field/stats/count
+    %%                        ^^^^ glean_module13.erl/rec_field/stats/time
     "#;
 
     xref_check(spec);
@@ -570,6 +614,7 @@ fn xref_pat_recordindex() {
     -record(rec, {field}).
     foo(#rec.field) -> ok.
     %%  ^^^^ glean_module14.erl/rec/rec/no_urls
+    %%      ^^^^^^ glean_module14.erl/rec_field/rec/field
     "#;
 
     xref_check(spec);
@@ -585,6 +630,8 @@ fn xref_record_in_type_test() {
     baz() ->
         #stats{count = 1, time = 2}.
     %%  ^^^^^^ glean_module15.erl/rec/stats/no_urls
+    %%         ^^^^^ glean_module15.erl/rec_field/stats/count
+    %%                    ^^^^ glean_module15.erl/rec_field/stats/time
     "#;
 
     xref_check(spec);
@@ -1150,6 +1197,9 @@ impl fmt::Display for XRefTarget {
                 f.write_str(format!("type/{}/{}", xref.key.name, xref.key.arity).as_str())
             }
             XRefTarget::Var(_) => Ok(()),
+            XRefTarget::RecordField(rf) => f.write_str(
+                format!("rec_field/{}/{}", rf.key.record_name, rf.key.field_name).as_str(),
+            ),
         }
     }
 }

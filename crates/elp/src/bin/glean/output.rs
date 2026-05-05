@@ -314,6 +314,7 @@ impl IndexedFacts {
                             arity: source.start,
                             file_id: x.key.file_id,
                         },
+                        XRefTarget::RecordField(_) => continue,
                     };
                     let val = XRefFactVal { source, target };
                     facts.push(val);
@@ -713,6 +714,22 @@ impl IndexedFacts {
                         let span_start = v.key.decl_span_start.unwrap_or(xref.source.start);
                         let key = (v.key.name.clone(), span_start);
                         var_map.entry(key).or_default().push(xref.source);
+                    }
+                    XRefTarget::RecordField(rf) => {
+                        let target_module = modules.get(&rf.key.file_id).unwrap_or(&unknown);
+                        let target_app = apps.get(&rf.key.file_id).unwrap_or(&unknown);
+                        file_typed.push(Schema2XRef {
+                            target: Schema2Declaration::RecordField(
+                                Schema2RecordFieldDecl {
+                                    record_name: rf.key.record_name.clone(),
+                                    field_name: rf.key.field_name.clone(),
+                                    module: target_module.clone(),
+                                    app: target_app.clone(),
+                                }
+                                .into(),
+                            ),
+                            source: xref.source,
+                        });
                     }
                 }
                 if let Some((caller_file_id, caller_name, caller_arity)) = caller {
@@ -1137,7 +1154,7 @@ impl IndexedFacts {
                     .into(),
                 ))
             }
-            XRefTarget::Var(_) => None,
+            XRefTarget::Var(_) | XRefTarget::RecordField(_) => None,
         }
     }
 }
