@@ -306,6 +306,8 @@ pub(crate) enum XRefTarget {
     Var(Key<VarTarget>),
     #[serde(skip)]
     RecordField(Key<RecordFieldTarget>),
+    #[serde(skip)]
+    Callback(Key<CallbackTarget>),
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -313,6 +315,14 @@ pub(crate) struct RecordFieldTarget {
     pub(crate) file_id: GleanFileId,
     pub(crate) record_name: String,
     pub(crate) field_name: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct CallbackTarget {
+    pub(crate) file_id: GleanFileId,
+    pub(crate) name: String,
+    pub(crate) arity: u32,
+    pub(crate) span: Location,
 }
 
 impl XRefTarget {
@@ -325,6 +335,7 @@ impl XRefTarget {
             XRefTarget::Type(xref) => &xref.key.file_id,
             XRefTarget::Var(xref) => &xref.key.file_id,
             XRefTarget::RecordField(xref) => &xref.key.file_id,
+            XRefTarget::Callback(xref) => &xref.key.file_id,
         }
     }
 
@@ -337,6 +348,7 @@ impl XRefTarget {
             XRefTarget::Type(xref) => &xref.key.file_id,
             XRefTarget::Var(xref) => &xref.key.file_id,
             XRefTarget::RecordField(xref) => &xref.key.file_id,
+            XRefTarget::Callback(xref) => &xref.key.file_id,
         }
     }
 }

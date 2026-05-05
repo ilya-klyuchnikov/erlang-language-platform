@@ -406,6 +406,39 @@ fn record_field_xref_multifield_test() {
 }
 
 #[test]
+fn callback_xref_test() {
+    let spec = r#"
+    //- /glean/app_glean/src/my_behaviour.erl
+    -module(my_behaviour).
+    -callback on_event(term()) -> ok.
+    //- /glean/app_glean/src/my_impl.erl
+    -module(my_impl).
+    -behaviour(my_behaviour).
+    on_event(_Event) -> ok.
+    "#;
+    let (facts, _, file_names, _, _) = facts_with_annotations(spec);
+    let mut callback_xrefs: Vec<String> = vec![];
+    for xref_fact in &facts.xrefs {
+        for xref in &xref_fact.xrefs {
+            let label = xref.target.to_string();
+            if label.starts_with("callback/") {
+                let file_name = file_names
+                    .get(xref.target.file_id())
+                    .unwrap_or(&"?".to_string())
+                    .clone();
+                callback_xrefs.push(format!("{file_name}/{label}"));
+            }
+        }
+    }
+    assert!(
+        callback_xrefs
+            .iter()
+            .any(|x| x.contains("my_behaviour.erl/callback/on_event/1")),
+        "Expected callback xref from on_event to my_behaviour, got: {callback_xrefs:?}"
+    );
+}
+
+#[test]
 fn xref_call_test() {
     let spec = r#"
     //- /glean/app_glean/src/glean_module61.erl
@@ -1200,6 +1233,9 @@ impl fmt::Display for XRefTarget {
             XRefTarget::RecordField(rf) => f.write_str(
                 format!("rec_field/{}/{}", rf.key.record_name, rf.key.field_name).as_str(),
             ),
+            XRefTarget::Callback(cb) => {
+                f.write_str(format!("callback/{}/{}", cb.key.name, cb.key.arity).as_str())
+            }
         }
     }
 }

@@ -314,7 +314,7 @@ impl IndexedFacts {
                             arity: source.start,
                             file_id: x.key.file_id,
                         },
-                        XRefTarget::RecordField(_) => continue,
+                        XRefTarget::RecordField(_) | XRefTarget::Callback(_) => continue,
                     };
                     let val = XRefFactVal { source, target };
                     facts.push(val);
@@ -723,6 +723,22 @@ impl IndexedFacts {
                                 Schema2RecordFieldDecl {
                                     record_name: rf.key.record_name.clone(),
                                     field_name: rf.key.field_name.clone(),
+                                    module: target_module.clone(),
+                                    app: target_app.clone(),
+                                }
+                                .into(),
+                            ),
+                            source: xref.source,
+                        });
+                    }
+                    XRefTarget::Callback(cb) => {
+                        let target_module = modules.get(&cb.key.file_id).unwrap_or(&unknown);
+                        let target_app = apps.get(&cb.key.file_id).unwrap_or(&unknown);
+                        file_typed.push(Schema2XRef {
+                            target: Schema2Declaration::Callback(
+                                Schema2CallbackDecl {
+                                    name: cb.key.name.clone(),
+                                    arity: cb.key.arity,
                                     module: target_module.clone(),
                                     app: target_app.clone(),
                                 }
@@ -1154,7 +1170,7 @@ impl IndexedFacts {
                     .into(),
                 ))
             }
-            XRefTarget::Var(_) | XRefTarget::RecordField(_) => None,
+            XRefTarget::Var(_) | XRefTarget::RecordField(_) | XRefTarget::Callback(_) => None,
         }
     }
 }

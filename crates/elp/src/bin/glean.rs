@@ -1302,6 +1302,37 @@ impl GleanIndexer {
 
                     acc
                 }
+                (hir::On::Entry, hir::FormIdx::FunctionClause(function_id)) => {
+                    let function_def_id =
+                        InFile::new(file_id, hir::FunctionDefId::new(function_id));
+                    if let Some(fun_def) = def_map.get_by_function_id(&function_def_id) {
+                        let fun_na = &fun_def.name;
+                        for behaviour_name in def_map.get_behaviours() {
+                            if let Some((behaviour_module, callbacks)) =
+                                sema.resolve_behaviour(file_id, behaviour_name)
+                                && let Some(cb_def) = callbacks.get(fun_na)
+                            {
+                                let cb_span = cb_def.source(db).syntax().text_range().into();
+                                let fun_ast = form_list[function_id].form_id.get_ast(db, file_id);
+                                let fun_range: Location = fun_ast.syntax().text_range().into();
+                                acc.push(XRef {
+                                    source: fun_range,
+                                    target: XRefTarget::Callback(
+                                        types::CallbackTarget {
+                                            file_id: behaviour_module.file.file_id.into(),
+                                            name: fun_na.name().to_string(),
+                                            arity: fun_na.arity(),
+                                            span: cb_span,
+                                        }
+                                        .into(),
+                                    ),
+                                    caller: None,
+                                });
+                            }
+                        }
+                    }
+                    acc
+                }
                 _ => acc,
             },
         );
