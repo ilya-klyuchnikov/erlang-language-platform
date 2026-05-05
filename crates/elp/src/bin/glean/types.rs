@@ -283,6 +283,31 @@ pub(crate) enum Fact {
     DeclTarget2 {
         facts: Vec<Key<Schema2DeclarationTarget>>,
     },
+    #[serde(rename = "erlang.AppInfo.2")]
+    AppInfo2 { facts: Vec<Key<Schema2AppInfo>> },
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2AppInfo {
+    pub(crate) name: String,
+    pub(crate) type_: Schema2AppType,
+}
+
+/// Mirrors the `enum { FirstParty | Otp | ThirdParty }` field on
+/// `erlang.AppInfo.2`. Keep the order in sync with the
+/// schema in `fbcode/glean/schema/source/erlang.angle`.
+#[repr(u32)]
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Schema2AppType {
+    FirstParty = 0,
+    Otp = 1,
+    ThirdParty = 2,
+}
+
+impl Serialize for Schema2AppType {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        (*self as u32).serialize(serializer)
+    }
 }
 
 #[derive(Serialize, Debug, Clone)]

@@ -43,6 +43,7 @@ use elp_syntax::ast::ExprMax;
 use elp_syntax::ast::Fa;
 use elp_syntax::ast::HasArity;
 use fxhash::FxHashMap;
+use fxhash::FxHashSet;
 use hir::AsName;
 use hir::Body;
 use hir::BodyOrigin;
@@ -128,6 +129,7 @@ struct IndexResult {
     facts: FxHashMap<String, IndexedFacts>,
     module_index: FxHashMap<GleanFileId, String>,
     app_index: FxHashMap<GleanFileId, String>,
+    app_infos: Vec<types::Schema2AppInfo>,
     errored_paths: Vec<String>,
 }
 
@@ -200,13 +202,9 @@ fn index_inner(
         multi: args.multi,
         schema2: args.schema2,
     };
-    let IndexResult {
-        facts,
-        module_index,
-        app_index,
-        errored_paths,
-    } = indexer.index(config)?;
-    let (output_bytes, counts) = write_results(facts, module_index, app_index, cli, args)?;
+    let result = indexer.index(config)?;
+    let errored_paths = result.errored_paths.clone();
+    let (output_bytes, counts) = write_results(result, cli, args)?;
     let mut metrics = IndexerMetrics::from_counts(counts, errored_paths.len());
     metrics.output_bytes = output_bytes;
     Ok((metrics, errored_paths))
@@ -214,21 +212,36 @@ fn index_inner(
 
 /// Serializes and writes facts. Returns (total bytes written, accumulated fact counts).
 fn write_results(
-    facts: FxHashMap<String, IndexedFacts>,
-    module_index: FxHashMap<GleanFileId, String>,
-    app_index: FxHashMap<GleanFileId, String>,
+    result: IndexResult,
     cli: &mut dyn Cli,
     args: &Glean,
 ) -> Result<(u64, FactCounts)> {
     if args.v2 {
         eprintln!("elp-glean: --v2 is deprecated and now a no-op (v2 is always enabled)");
     }
+    let IndexResult {
+        facts,
+        module_index,
+        app_index,
+        app_infos,
+        ..
+    } = result;
     let mut total_bytes: u64 = 0;
     let mut total_counts = FactCounts::default();
+    let mut app_infos_emitted = false;
     for (name, fact) in facts {
         let (fact, counts) = if args.schema2 {
             let (v1_facts, _) = fact.clone().into_glean_facts(&module_index);
-            let (v2_facts, counts) = fact.into_schema2_facts(&module_index, &app_index);
+            let (mut v2_facts, counts) = fact.into_schema2_facts(&module_index, &app_index);
+            if !app_infos_emitted && !app_infos.is_empty() {
+                v2_facts.push(types::Fact::AppInfo2 {
+                    facts: app_infos
+                        .iter()
+                        .map(|ai| types::Key { key: ai.clone() })
+                        .collect(),
+                });
+                app_infos_emitted = true;
+            }
             let mut all_facts = v1_facts;
             all_facts.extend(v2_facts);
             (all_facts, counts)
@@ -308,9 +321,11 @@ impl GleanIndexer {
                 vec![]
             };
             // app index: file_id → OTP application name (for erlang.2 schema)
-            let app_index: FxHashMap<GleanFileId, String> = {
+            let (app_index, app_infos) = {
                 let project_data = db.project_data(project_id);
                 let mut index = FxHashMap::default();
+                let mut seen_apps = FxHashSet::default();
+                let mut infos = Vec::new();
                 for &source_root_id in project_data
                     .source_roots
                     .iter()
@@ -318,6 +333,17 @@ impl GleanIndexer {
                 {
                     if let Some(app_data) = db.app_data(source_root_id) {
                         let app_name = app_data.name.as_str().to_string();
+                        if seen_apps.insert(app_name.clone()) {
+                            let type_ = match app_data.app_type {
+                                AppType::App => types::Schema2AppType::FirstParty,
+                                AppType::Otp => types::Schema2AppType::Otp,
+                                AppType::Dep => types::Schema2AppType::ThirdParty,
+                            };
+                            infos.push(types::Schema2AppInfo {
+                                name: app_name.clone(),
+                                type_,
+                            });
+                        }
                         let source_root = db.source_root(source_root_id);
                         for file_id in source_root.iter() {
                             let file_app = db
@@ -328,7 +354,7 @@ impl GleanIndexer {
                         }
                     }
                 }
-                index
+                (index, infos)
             };
             // Extend module_index with OTP files for xrefs to OTP functions
             for &source_root_id in &otp_source_roots {
@@ -415,6 +441,7 @@ impl GleanIndexer {
                 facts,
                 module_index,
                 app_index,
+                app_infos,
                 errored_paths: errored,
             }
         })?;

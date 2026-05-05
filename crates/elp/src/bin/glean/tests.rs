@@ -124,7 +124,14 @@ fn serialization_test() {
     module_index.insert(file_id.into(), module_name.to_string());
 
     let app_index = FxHashMap::default();
-    write_results(map, module_index, app_index, &mut cli, &args).expect("success");
+    let result = IndexResult {
+        facts: map,
+        module_index,
+        app_index,
+        app_infos: vec![],
+        errored_paths: vec![],
+    };
+    write_results(result, &mut cli, &args).expect("success");
     let (out, err) = cli.to_strings();
     let expected = resource_file!("glean/serialization_test.out");
     assert_eq!(expected.data().trim(), &out);
@@ -169,6 +176,48 @@ fn schema2_serialization_test() {
             "Expected {expected} in schema2 output, got: {predicates:?}",
         );
     }
+}
+
+#[test]
+fn app_info_serialization_test() {
+    use types::Schema2AppInfo;
+    use types::Schema2AppType;
+
+    let app_infos = vec![
+        Schema2AppInfo {
+            name: "my_app".to_string(),
+            type_: Schema2AppType::FirstParty,
+        },
+        Schema2AppInfo {
+            name: "stdlib".to_string(),
+            type_: Schema2AppType::Otp,
+        },
+        Schema2AppInfo {
+            name: "lager".to_string(),
+            type_: Schema2AppType::ThirdParty,
+        },
+    ];
+    let facts: Vec<Fact> = vec![Fact::AppInfo2 {
+        facts: app_infos.into_iter().map(|ai| Key { key: ai }).collect(),
+    }];
+    let json = serde_json::to_value(&facts).unwrap();
+    let app_info_fact = &json[0]["facts"];
+
+    assert_eq!(app_info_fact[0]["key"]["name"], "my_app");
+    assert_eq!(
+        app_info_fact[0]["key"]["type_"], 0,
+        "FirstParty should serialize as 0"
+    );
+    assert_eq!(app_info_fact[1]["key"]["name"], "stdlib");
+    assert_eq!(
+        app_info_fact[1]["key"]["type_"], 1,
+        "Otp should serialize as 1"
+    );
+    assert_eq!(app_info_fact[2]["key"]["name"], "lager");
+    assert_eq!(
+        app_info_fact[2]["key"]["type_"], 2,
+        "ThirdParty should serialize as 2"
+    );
 }
 
 #[test]
