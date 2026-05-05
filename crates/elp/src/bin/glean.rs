@@ -320,7 +320,11 @@ impl GleanIndexer {
                         let app_name = app_data.name.as_str().to_string();
                         let source_root = db.source_root(source_root_id);
                         for file_id in source_root.iter() {
-                            index.insert(file_id.into(), app_name.clone());
+                            let file_app = db
+                                .file_app_data(file_id)
+                                .map(|ad| ad.name.as_str().to_string())
+                                .unwrap_or_else(|| app_name.clone());
+                            index.insert(file_id.into(), file_app);
                         }
                     }
                 }
