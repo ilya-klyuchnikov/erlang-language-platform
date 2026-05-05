@@ -580,20 +580,6 @@ impl GleanIndexer {
         let exdoc_link: Option<String> = None; // @oss-only
 
         let def_map = db.def_map(file_id);
-        let def_map_local = db.def_map_local(file_id);
-
-        let all_macros: Vec<types::MacroInfo> = def_map_local
-            .get_macros()
-            .iter()
-            .map(|(mn, macro_def)| {
-                let definition_text = Some(macro_def.source(db).syntax().text().to_string());
-                types::MacroInfo {
-                    name: mn.name().to_string(),
-                    arity: mn.arity(),
-                    definition_text,
-                }
-            })
-            .collect();
 
         let record_def_texts: Vec<types::RecordDefText> = def_map
             .get_records()
@@ -721,7 +707,6 @@ impl GleanIndexer {
             nif_fns,
             included_files,
             record_fields,
-            all_macros,
             record_def_texts,
             behaviour_callback_stubs,
         }
@@ -783,6 +768,7 @@ impl GleanIndexer {
                                 v1_span: xref.source.clone(),
                                 arity: x.key.arity,
                                 span: def_span.clone(),
+                                definition_text: None,
                             }
                             .into(),
                         );
@@ -1000,8 +986,10 @@ impl GleanIndexer {
         }
 
         for (macros, def) in def_map.get_macros() {
-            let range = def.source(db).syntax().text_range();
+            let source = def.source(db);
+            let range = source.syntax().text_range();
             let span: Location = range.into();
+            let definition_text = Some(source.syntax().text().to_string());
             let decl = Declaration::MacroDeclaration(
                 MacroDecl {
                     name: macros.name().to_string(),
@@ -1009,6 +997,7 @@ impl GleanIndexer {
                     v1_span: span.clone(),
                     arity: macros.arity(),
                     span,
+                    definition_text,
                 }
                 .into(),
             );

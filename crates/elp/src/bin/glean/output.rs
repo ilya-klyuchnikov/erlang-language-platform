@@ -476,6 +476,15 @@ impl IndexedFacts {
                             .into(),
                         );
                         file_schema2_decls.push(s2decl);
+                        if m.key.definition_text.is_some() {
+                            macro_defs.push(
+                                Schema2MacroDef {
+                                    declaration: decl.clone().into(),
+                                    definition_text: m.key.definition_text.clone(),
+                                }
+                                .into(),
+                            );
+                        }
                         macro_decls.push(decl.into());
                     }
                     Declaration::TypeDeclaration(ref t) => {
@@ -849,26 +858,6 @@ impl IndexedFacts {
                     }
                 })
                 .collect();
-            let (mc_defs, mc_decls): (Vec<_>, Vec<_>) = mf
-                .all_macros
-                .iter()
-                .map(|mi| {
-                    let decl = Schema2MacroDecl {
-                        name: mi.name.clone(),
-                        arity: mi.arity,
-                        module: mf.name.clone(),
-                        app: app.clone(),
-                    };
-                    let def = Schema2MacroDef {
-                        declaration: decl.clone().into(),
-                        definition_text: mi.definition_text.clone(),
-                    }
-                    .into();
-                    (def, decl.into())
-                })
-                .unzip();
-            macro_defs.extend(mc_defs);
-            macro_decls.extend(mc_decls);
             record_defs.extend(mf.record_def_texts.iter().map(|rd| {
                 Schema2RecordDef {
                     declaration: Schema2RecordDecl {

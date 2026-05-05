@@ -101,8 +101,6 @@ pub(crate) struct ModuleFact {
     #[serde(skip)]
     pub(crate) record_fields: Vec<RecordFieldInfo>,
     #[serde(skip)]
-    pub(crate) all_macros: Vec<MacroInfo>,
-    #[serde(skip)]
     pub(crate) record_def_texts: Vec<RecordDefText>,
     #[serde(skip)]
     pub(crate) behaviour_callback_stubs: Vec<BehaviourCallbackStub>,
@@ -120,13 +118,6 @@ pub(crate) struct BehaviourCallbackStub {
 pub(crate) struct RecordDefText {
     pub(crate) name: String,
     pub(crate) definition_text: String,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct MacroInfo {
-    pub(crate) name: String,
-    pub(crate) arity: Option<u32>,
-    pub(crate) definition_text: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -525,6 +516,8 @@ pub(crate) struct MacroDecl {
     pub(crate) arity: Option<u32>,
     #[serde(skip)]
     pub(crate) span: Location,
+    #[serde(skip)]
+    pub(crate) definition_text: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone)]
