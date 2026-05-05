@@ -104,6 +104,16 @@ pub(crate) struct ModuleFact {
     pub(crate) all_macros: Vec<MacroInfo>,
     #[serde(skip)]
     pub(crate) record_def_texts: Vec<RecordDefText>,
+    #[serde(skip)]
+    pub(crate) behaviour_callback_stubs: Vec<BehaviourCallbackStub>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct BehaviourCallbackStub {
+    pub(crate) callback_name: String,
+    pub(crate) callback_arity: u32,
+    pub(crate) behaviour_module: String,
+    pub(crate) behaviour_app: String,
 }
 
 #[derive(Debug, Clone)]

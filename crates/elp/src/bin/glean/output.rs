@@ -938,6 +938,15 @@ impl IndexedFacts {
                 );
                 callback_decls.push(cb_decl.into());
             }
+            for stub in &mf.behaviour_callback_stubs {
+                let cb_decl = Schema2CallbackDecl {
+                    name: stub.callback_name.clone(),
+                    arity: stub.callback_arity,
+                    module: stub.behaviour_module.clone(),
+                    app: stub.behaviour_app.clone(),
+                };
+                callback_decls.push(cb_decl.into());
+            }
             if let Some(doc) = mf.module_doc {
                 comments.push(
                     Schema2CommentFact {

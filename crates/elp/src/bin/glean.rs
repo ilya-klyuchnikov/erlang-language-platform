@@ -493,6 +493,34 @@ impl GleanIndexer {
             .map(|(_, behaviour)| behaviour.name.to_string())
             .collect();
 
+        let behaviour_callback_stubs: Vec<types::BehaviourCallbackStub> =
+            behaviours
+                .iter()
+                .flat_map(|behaviour_name| {
+                    let name = Name::from_erlang_service(behaviour_name);
+                    sema.resolve_behaviour(file_id, &name)
+                        .into_iter()
+                        .filter_map(move |(behaviour_mod, callbacks)| {
+                            let app_data =
+                                db.app_data(db.file_source_root(behaviour_mod.file.file_id))?;
+                            if app_data.app_type != AppType::Otp {
+                                return None;
+                            }
+                            let bn = behaviour_name.clone();
+                            let ba = app_data.name.as_str().to_string();
+                            Some(callbacks.into_keys().map(move |na| {
+                                types::BehaviourCallbackStub {
+                                    callback_name: na.name().to_string(),
+                                    callback_arity: na.arity(),
+                                    behaviour_module: bn.clone(),
+                                    behaviour_app: ba.clone(),
+                                }
+                            }))
+                        })
+                        .flatten()
+                })
+                .collect();
+
         let module_attribute = sema.module_attribute(file_id);
         let module_doc = module_attribute.as_ref().and_then(|ma| {
             let docs = Documentation::new(db, &sema);
@@ -664,6 +692,7 @@ impl GleanIndexer {
             record_fields,
             all_macros,
             record_def_texts,
+            behaviour_callback_stubs,
         }
     }
 
