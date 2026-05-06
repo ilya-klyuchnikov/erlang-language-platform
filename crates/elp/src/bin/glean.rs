@@ -580,8 +580,9 @@ impl GleanIndexer {
         let exdoc_link: Option<String> = None; // @oss-only
 
         let def_map = db.def_map(file_id);
+        let def_map_local = db.def_map_local(file_id);
 
-        let record_def_texts: Vec<types::RecordDefText> = def_map
+        let record_def_texts: Vec<types::RecordDefText> = def_map_local
             .get_records()
             .iter()
             .map(|(name, rec_def)| {
@@ -593,7 +594,7 @@ impl GleanIndexer {
             })
             .collect();
 
-        let record_fields: Vec<types::RecordFieldInfo> = def_map
+        let record_fields: Vec<types::RecordFieldInfo> = def_map_local
             .get_records()
             .iter()
             .flat_map(|(name, rec_def)| {
