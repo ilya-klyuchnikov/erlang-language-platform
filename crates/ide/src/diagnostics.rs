@@ -49,22 +49,17 @@ use elp_ide_ssr::Match;
 use elp_ide_ssr::SsrSearchScope;
 use elp_ide_ssr::match_pattern;
 use elp_project_model::AppName;
-use elp_syntax::NodeOrToken;
-use elp_syntax::Parse;
 use elp_syntax::SourceFile;
 use elp_syntax::SyntaxKind;
-use elp_syntax::SyntaxNode;
 use elp_syntax::TextRange;
 use elp_syntax::TextSize;
 use elp_syntax::algo;
 use elp_syntax::ast;
 use elp_syntax::ast::AstNode;
 use elp_syntax::ast::HasLabel;
-use elp_syntax::ast::edit;
 use elp_syntax::ast::edit::IndentLevel;
 use elp_syntax::ast::edit::start_of_line;
 use elp_syntax::label::Label;
-use elp_syntax::ted::Element;
 use elp_types_db::TypedSemantic;
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
@@ -1788,9 +1783,6 @@ pub fn native_diagnostics(
     let labeled_syntax_errors = if report_diagnostics {
         let sema = Semantic::new(db);
 
-        // TODO(T258950369): These diagnostics are currently unreliable in presence of conditional macros.
-        // res.append(&mut form_missing_separator_diagnostics(&parse));
-
         adhoc_semantic_diagnostics
             .iter()
             .for_each(|f| f(&mut res, &sema, file_id, file_kind));
@@ -2257,107 +2249,6 @@ pub fn collect_body_diagnostics(sema: &Semantic, file_id: FileId) -> Vec<hir::Bo
     }
 
     diagnostics
-}
-
-#[allow(dead_code)]
-fn form_missing_separator_diagnostics(parse: &Parse<ast::SourceFile>) -> Vec<Diagnostic> {
-    parse
-        .tree()
-        .forms()
-        .flat_map(|form: ast::Form| match form {
-            ast::Form::ExportAttribute(f) => {
-                check_missing_sep(f.funs(), SyntaxKind::ANON_COMMA, ",")
-            }
-            ast::Form::ExportTypeAttribute(f) => {
-                check_missing_sep(f.types(), SyntaxKind::ANON_COMMA, ",")
-            }
-            ast::Form::ImportAttribute(f) => {
-                check_missing_sep(f.funs(), SyntaxKind::ANON_COMMA, ",")
-            }
-            ast::Form::ImportRecordAttribute(f) => {
-                let names = f.records().into_iter().flat_map(|r| r.names());
-                check_missing_sep(names, SyntaxKind::ANON_COMMA, ",")
-            }
-            ast::Form::RecordDecl(f) => record_decl_check_missing_comma(f),
-            ast::Form::TypeAlias(f) => {
-                let args = f
-                    .name()
-                    .and_then(|name| name.args())
-                    .into_iter()
-                    .flat_map(|args| args.args());
-                check_missing_sep(args, SyntaxKind::ANON_COMMA, ",")
-            }
-            ast::Form::Opaque(f) => {
-                let args = f
-                    .name()
-                    .and_then(|name| name.args())
-                    .into_iter()
-                    .flat_map(|args| args.args());
-                check_missing_sep(args, SyntaxKind::ANON_COMMA, ",")
-            }
-            _ => vec![],
-        })
-        .collect()
-}
-
-fn check_missing_sep<Node: AstNode + std::fmt::Debug>(
-    nodes: impl Iterator<Item = Node>,
-    separator: SyntaxKind,
-    item: &'static str,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
-    for node in nodes.skip(1) {
-        let syntax = node.syntax();
-        if let Some(previous) = non_whitespace_prev_token(syntax)
-            && previous.kind() != separator
-        {
-            diagnostics.push(make_missing_diagnostic(previous.text_range(), item))
-        }
-    }
-
-    diagnostics
-}
-
-fn record_decl_check_missing_comma(record: ast::RecordDecl) -> Vec<Diagnostic> {
-    if let Some(name) = record.name()
-        && let Some(next) = non_whitespace_next_token(name.syntax())
-        && next.kind() != SyntaxKind::ANON_COMMA
-    {
-        return vec![make_missing_diagnostic(name.syntax().text_range(), ",")];
-    }
-
-    vec![]
-}
-
-fn non_whitespace_next_token(node: &SyntaxNode) -> Option<NodeOrToken> {
-    let tok = node.last_token()?;
-    let r = edit::next_tokens(tok).skip(1).find(|tok| {
-        if let Some(node) = tok.syntax_element().as_token() {
-            node.kind() != SyntaxKind::WHITESPACE && node.kind() != SyntaxKind::COMMENT
-        } else {
-            false
-        }
-    });
-    r.map(NodeOrToken::Token)
-}
-
-fn non_whitespace_prev_token(node: &SyntaxNode) -> Option<NodeOrToken> {
-    let tok = node.first_token()?;
-    let r = edit::prev_tokens(tok).skip(1).find(|tok| {
-        if let Some(node) = tok.syntax_element().as_token() {
-            node.kind() != SyntaxKind::WHITESPACE && node.kind() != SyntaxKind::COMMENT
-        } else {
-            false
-        }
-    });
-    r.map(NodeOrToken::Token)
-}
-
-pub(crate) fn make_missing_diagnostic(range: TextRange, item: &'static str) -> Diagnostic {
-    let message = format!("Missing '{item}'");
-    Diagnostic::new(DiagnosticCode::MissingSeparator, message, range)
-        .with_severity(Severity::Warning)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -3317,80 +3208,6 @@ mod tests {
 -module(main).
 foo() -> XX 3.0.
     %%   ^^ error: P1711: Syntax Error
-"#,
-        );
-    }
-
-    #[test]
-    #[should_panic] // T258950369: Remove once ifdef support is completed
-    fn export_attribute_missing_comma() {
-        check_diagnostics(
-            r#"
--module(main).
--export([foo/0 bar/1]).
-    %%       ^ warning: W0004: Missing ','
-"#,
-        );
-    }
-
-    #[test]
-    #[should_panic] // T258950369: Remove once ifdef support is completed
-    fn export_type_attribute_missing_comma() {
-        check_diagnostics(
-            r#"
--module(main).
--export_type([foo/0 bar/1]).
-         %%       ^ warning: W0004: Missing ','
-"#,
-        );
-    }
-
-    #[test]
-    #[should_panic] // T258950369: Remove once ifdef support is completed
-    fn import_attribute_missing_comma() {
-        check_diagnostics(
-            r#"
--module(main).
--import(bb, [foo/0 bar/1]).
-         %%      ^ warning: W0004: Missing ','
-"#,
-        );
-    }
-
-    #[test]
-    #[should_panic] // T258950369: Remove once ifdef support is completed
-    fn import_record_attribute_missing_comma() {
-        check_diagnostics(
-            r#"
--module(main).
--import_record(bb, [foo bar]).
-                %%    ^ warning: W0004: Missing ','
-"#,
-        );
-    }
-
-    #[test]
-    #[should_panic] // T258950369: Remove once ifdef support is completed
-    fn type_decl_missing_comma() {
-        check_diagnostics(
-            r#"
--module(main).
--type foo(A B) :: [A,B].
-       %% ^ warning: W0004: Missing ','
-"#,
-        );
-    }
-
-    #[test]
-    #[should_panic] // T258950369: Remove once ifdef support is completed
-    fn record_decl_missing_comma() {
-        check_diagnostics(
-            r#"
--module(main).
--record(foo  {f1, f2 = 3}).
-     %% ^^^ warning: W0004: Missing ','
-main(X) ->
-  {X#foo.f1, X#foo.f2}.
 "#,
         );
     }

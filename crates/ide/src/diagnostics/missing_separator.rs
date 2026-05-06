@@ -126,31 +126,8 @@ pub(crate) static LINTER: MissingSeparatorLinter = MissingSeparatorLinter;
 // cargo test --package elp_ide --lib
 #[cfg(test)]
 mod tests {
-    use elp_syntax::ast;
 
-    use crate::diagnostics::form_missing_separator_diagnostics;
     use crate::tests::check_diagnostics;
-    // use crate::tests::check_fix;
-
-    // The followings tests exercise missing separator for function directly.
-
-    #[test]
-    fn fun_decl_missing_semi_no_warning() {
-        let text = "foo(2)->3.";
-
-        let parsed = ast::SourceFile::parse_text(text);
-        let d = form_missing_separator_diagnostics(&parsed);
-        assert_eq!(format!("{d:?}"), "[]")
-    }
-
-    #[test]
-    fn fun_decl_missing_semi_no_warning_2() {
-        let text = concat!("foo(1)->2;\n", "foo(2)->3.");
-
-        let parsed = ast::SourceFile::parse_text(text);
-        let d = form_missing_separator_diagnostics(&parsed);
-        assert_eq!(format!("{d:?}"), "[]")
-    }
 
     #[test]
     fn fun_decl_missing_semi_1() {
