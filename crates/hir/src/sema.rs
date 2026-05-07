@@ -1345,6 +1345,9 @@ impl<'a, T: Clone> InFunctionBody<'a, T> {
         function_id: InFile<FunctionDefId>,
         value: T,
     ) -> InFunctionBody<'a, T> {
+        // `body.clause_ids` is parallel to `body.clauses` (one entry per Arena
+        // clause; macro-expanded clauses share their parent's id), so this
+        // `.zip` covers every clause without truncation.
         let clause_bodies = body
             .clauses
             .iter()
@@ -2219,6 +2222,52 @@ mod tests {
             ]
         "#]]
         .assert_debug_eq(&index.complete("ME"));
+    }
+
+    #[test]
+    fn in_function_body_macro_expanding_to_multiple_clauses() {
+        // Regression test: a macro that expands to multiple function clauses
+        // produces a `FunctionBody` whose `clauses` Arena has more entries
+        // than there are AST function-clause ids. `InFunctionBody::in_clause`
+        // must remain valid for every clause yielded by `clauses()`.
+        let fixture = r#"
+             //- /src/main.erl
+             -module(main).
+             -define(TWO_CLAUSES,
+                 foo(0) -> zero;
+                 foo(N) -> N
+             ).
+             ?TWO_CLAUSES.
+             "#;
+        let (db, fixture) = TestDB::with_fixture(fixture);
+        let sema = Semantic::new(&db);
+        let file_id = fixture.files[0];
+        let def_map = sema.def_map(file_id);
+        // The macro call `?TWO_CLAUSES.` is registered as a single function
+        // form named after the macro (here, `'TWO_CLAUSES'/0`). When lowered,
+        // the macro expands to two function clauses sharing one
+        // `FunctionClauseId`.
+        let macro_form = def_map
+            .get_function(&crate::NameArity::new(
+                crate::Name::from_erlang_service("TWO_CLAUSES"),
+                0,
+            ))
+            .expect("'TWO_CLAUSES'/0 should be registered");
+        let function_def_id = macro_form.function_id;
+        let function_body = sema.to_function_body(InFile::new(file_id, function_def_id));
+
+        // The macro expands to two function clauses but only one AST
+        // function-clause id. Before the fix, the second clause's id would be
+        // out of bounds for the internal `clause_bodies` arena and trigger a
+        // panic in `InFunctionBody::in_clause` (see sema.rs:1420).
+        for (clause_id, _) in function_body.clauses() {
+            let _ = function_body.in_clause(clause_id);
+        }
+
+        // After the fix, `clause_ids` is parallel to `clauses` (the macro id
+        // is duplicated for each expanded clause).
+        assert_eq!(function_body.body.clauses.iter().count(), 2);
+        assert_eq!(function_body.body.clause_ids.len(), 2);
     }
 
     #[test]

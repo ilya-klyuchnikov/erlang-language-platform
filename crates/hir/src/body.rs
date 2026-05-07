@@ -566,6 +566,13 @@ impl FunctionBody {
             let fun_asts = fun_def.source(db.upcast());
             let form_list = db.file_form_list(function_id.file_id);
             let mut source_maps = Vec::with_capacity(fun_def.function_clause_ids.len());
+            let mut clause_ids: Vec<FunctionClauseId> =
+                Vec::with_capacity(fun_def.function_clause_ids.len());
+            // `clause_ids` is built parallel to the `clauses` Arena: one entry
+            // per Arena clause. A macro call that expands to multiple function
+            // clauses contributes the same `FunctionClauseId` repeatedly so
+            // that callers indexing by Arena `ClauseId` always find a matching
+            // source clause id.
             let clauses: Arena<Arc<FunctionClauseBody>> = fun_def
                 .function_clause_ids
                 .iter()
@@ -579,7 +586,7 @@ impl FunctionBody {
                             // with the per-clause cache.
                             let (clause_body, source_map) =
                                 db.function_clause_body_with_source(clause_id_in_file);
-                            vec![(clause_body, source_map)]
+                            vec![(clause_body, source_map, clause_id)]
                         }
                         Some(clause_ast) => {
                             // Macro clause: lower directly, since macro
@@ -597,21 +604,24 @@ impl FunctionBody {
                             );
                             ctx.set_function_info(&function.name);
                             ctx.lower_clause_or_macro_body(clause_ast, &clause_id_in_file, None)
-                                .map(|(body, source_map)| (Arc::new(body), Arc::new(source_map)))
+                                .map(|(body, source_map)| {
+                                    (Arc::new(body), Arc::new(source_map), clause_id)
+                                })
                                 .collect()
                         }
                         None => vec![],
                     }
                 })
-                .map(|(clause_body, source_map)| {
+                .map(|(clause_body, source_map, clause_id)| {
                     source_maps.push(source_map);
+                    clause_ids.push(clause_id);
                     clause_body
                 })
                 .collect();
 
             let mut body = FunctionBody {
                 function_id,
-                clause_ids: fun_def.function_clause_ids.clone(),
+                clause_ids,
                 clauses,
                 spec: None,
             };
