@@ -1743,7 +1743,7 @@ mod tests {
               head_mismatcX(0) -> 0.
           "#,
             expect![[r#"
-                {"path":"app_a/src/lints.erl","line":5,"char":3,"code":"ELP","severity":"error","name":"P1700 (head_mismatch)","original":null,"replacement":null,"description":"head mismatch 'head_mismatcX' vs 'head_mismatch'\n\nFor more information see: <BASE_URL>/erlang-error-index/p/P1700","docPath":null}
+                {"path":"app_a/src/lints.erl","line":5,"char":3,"endLine":5,"endChar":16,"code":"ELP","severity":"error","name":"P1700 (head_mismatch)","original":null,"replacement":null,"description":"head mismatch 'head_mismatcX' vs 'head_mismatch'\n\nFor more information see: <BASE_URL>/erlang-error-index/p/P1700","docPath":null}
             "#]],
             expect![""],
         );

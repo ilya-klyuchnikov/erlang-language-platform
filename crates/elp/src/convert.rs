@@ -130,6 +130,9 @@ pub fn eqwalizer_to_arc_diagnostic(
     let pos = position(line_index, d.range.start());
     let line_num = pos.line + 1;
     let character = Some(pos.character + 1);
+    let end_pos = position(line_index, d.range.end());
+    let end_line = end_pos.line + 1;
+    let end_character = end_pos.character + 1;
     let severity = arc_types::Severity::Error;
     // formatting: https://fburl.com/max_wiki_link_to_phabricator_rich_text
     let explanation = match &d.explanation {
@@ -160,6 +163,7 @@ pub fn eqwalizer_to_arc_diagnostic(
         d.expression.clone(),
         None,
     )
+    .with_end_position(end_line, end_character)
 }
 
 fn from_related<F>(
@@ -245,6 +249,9 @@ pub fn ide_to_arc_diagnostic(
     let pos = position(line_index, diagnostic.range.start());
     let line_num = pos.line + 1;
     let character = Some(pos.character + 1);
+    let end_pos = position(line_index, diagnostic.range.end());
+    let end_line = end_pos.line + 1;
+    let end_character = end_pos.character + 1;
     let message = diagnostic.message.clone();
     let description = match diagnostic.code.as_uri() {
         Some(uri) => format!("{message}\n\nFor more information see: {uri}"),
@@ -262,6 +269,7 @@ pub fn ide_to_arc_diagnostic(
         None,
         doc_path,
     )
+    .with_end_position(end_line, end_character)
 }
 
 pub struct ArcFix {

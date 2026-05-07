@@ -23,6 +23,14 @@ pub struct Diagnostic {
     path: String,
     line: Option<u32>,
     char: Option<u32>,
+    // End-position of the diagnostic range, when known. The arc lint protocol
+    // does not require these, but downstream consumers (e.g. SSR audit tools
+    // reading `elp ssr --format=json`) benefit from knowing the full range
+    // rather than just the start point. Omitted from JSON when None.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    end_line: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    end_char: Option<u32>,
     // Linter name (normally this would need to match code in fbsource-lint-engine.toml)
     code: String,
     // Message severity
@@ -96,6 +104,8 @@ impl Diagnostic {
             path: path.display().to_string(), // lossy on Windows for unicode paths
             line: Some(line),
             r#char: character,
+            end_line: None,
+            end_char: None,
             code: "ELP".to_owned(),
             severity,
             name,
@@ -104,6 +114,18 @@ impl Diagnostic {
             description: Some(description),
             doc_path,
         }
+    }
+
+    /// Attach a precise end-position to the diagnostic. Both values are
+    /// 1-indexed (matching `line` / `char`). Used by callers that have a
+    /// `TextRange` available; producers that only know a single line/column
+    /// (e.g. parse errors) leave this unset.
+    /// Attach the diagnostic's end-position. Both values are 1-indexed,
+    /// matching `line` / `char`.
+    pub fn with_end_position(mut self, end_line: u32, end_character: u32) -> Self {
+        self.end_line = Some(end_line);
+        self.end_char = Some(end_character);
+        self
     }
 
     pub fn with_fix(
@@ -115,6 +137,11 @@ impl Diagnostic {
     ) -> Self {
         self.line = Some(line);
         self.r#char = character;
+        // The fix has its own start position but no end. Clear any prior
+        // end-position so consumers don't read the resulting record as a
+        // coherent range pairing the fix start with the diagnostic end.
+        self.end_line = None;
+        self.end_char = None;
         self.original = Some(original);
         self.replacement = Some(replacement);
         self
