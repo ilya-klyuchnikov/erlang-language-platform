@@ -1226,7 +1226,7 @@ impl GleanIndexer {
         vars: FxHashMap<&Location, &String>,
     ) -> Vec<VarDecl> {
         let mut result = vec![];
-        if !db.is_eqwalizer_enabled(file_id) {
+        if !db.file_kind(file_id).is_module() || !db.is_eqwalizer_enabled(file_id) {
             return result;
         }
         let module_diagnostics = db.eqwalizer_diagnostics_by_project(project_id, vec![file_id]);
