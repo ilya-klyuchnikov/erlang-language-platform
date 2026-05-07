@@ -24,7 +24,6 @@ imara-diff.workspace = true
 itertools.workspace = true
 lazy_static.workspace = true
 log.workspace = true
-profile.workspace = true
 rayon.workspace = true
 regex.workspace = true
 serde.workspace = true

@@ -56,6 +56,7 @@ use elp_ide_db::elp_base_db::salsa::ParallelDatabase;
 use elp_ide_db::eqwalizer::type_references;
 use elp_ide_db::erlang_service::ParseResult;
 use elp_ide_db::find_best_token;
+use elp_ide_db::memory_usage::Bytes;
 use elp_ide_db::rename::RenameError;
 use elp_ide_db::source_change::SourceChange;
 use elp_project_model::AppName;
@@ -232,7 +233,7 @@ impl AnalysisHost {
     }
 
     /// NB: this clears the database
-    pub fn per_query_memory_usage(&mut self) -> Vec<(String, profile::Bytes, usize)> {
+    pub fn per_query_memory_usage(&mut self) -> Vec<(String, Bytes, usize)> {
         self.db.per_query_memory_usage()
     }
 

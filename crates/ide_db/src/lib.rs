@@ -57,6 +57,7 @@ pub mod docs;
 pub mod eqwalizer;
 mod erl_ast;
 mod line_index;
+pub mod memory_usage;
 // @fb-only: pub mod meta_only;
 pub mod metadata;
 mod search;

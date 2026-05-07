@@ -28,7 +28,6 @@ use elp::arc_types;
 use elp::build::types::LoadResult;
 use elp::cli::Cli;
 use elp::convert;
-use elp::memory_usage::MemoryUsage;
 use elp_ide::Analysis;
 use elp_ide::AnalysisHost;
 use elp_ide::TextRange;
@@ -36,6 +35,8 @@ use elp_ide::elp_ide_db::EqwalizerDiagnostic;
 use elp_ide::elp_ide_db::elp_base_db::AbsPath;
 use elp_ide::elp_ide_db::elp_base_db::FileId;
 use elp_ide::elp_ide_db::elp_base_db::VfsPath;
+use elp_ide::elp_ide_db::memory_usage::MemoryUsage;
+use elp_ide::elp_ide_db::memory_usage::memory_usage;
 use indicatif::ProgressBar;
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -383,14 +384,14 @@ pub(crate) fn print_memory_usage(
 ) -> Result<()> {
     let mem = host.per_query_memory_usage();
 
-    let before = profile::memory_usage();
+    let before = memory_usage();
     drop(vfs);
-    let vfs = before.allocated - profile::memory_usage().allocated;
+    let vfs = before.allocated - memory_usage().allocated;
 
-    let before = profile::memory_usage();
+    let before = memory_usage();
     drop(host);
-    let unaccounted = before.allocated - profile::memory_usage().allocated;
-    let remaining = profile::memory_usage().allocated;
+    let unaccounted = before.allocated - memory_usage().allocated;
+    let remaining = memory_usage().allocated;
 
     for (name, bytes, entries) in mem {
         writeln!(cli, "{bytes:>8} {entries:>6} {name}")?;

@@ -17,13 +17,13 @@ use elp_base_db::salsa::QueryTable;
 use elp_base_db::salsa::debug::DebugQueryTable;
 use elp_base_db::salsa::debug::TableEntry;
 use paths::AbsPathBuf;
-use profile::Bytes;
-use profile::memory_usage;
 
 use crate::RootDatabase;
 use crate::common_test;
 use crate::docs;
 use crate::erl_ast;
+use crate::memory_usage::Bytes;
+use crate::memory_usage::memory_usage;
 
 impl RootDatabase {
     pub fn apply_change(

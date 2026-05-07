@@ -72,7 +72,6 @@ parking_lot = "0.12.3"
 paths = { git = "https://github.com/rust-lang/rust-analyzer", rev = "2026-04-13" }
 petgraph = "0.8.3"
 proc-macro2 = "1.0.86"
-profile = { git = "https://github.com/rust-lang/rust-analyzer", rev = "2026-04-13" }
 quote = "1.0.36"
 rayon = "1.10.0"
 regex = "1.12.3"
