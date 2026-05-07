@@ -782,8 +782,8 @@ impl GleanIndexer {
                             }
                             .into(),
                         );
-                        file_decl.declarations.push(decl);
-                        file_decl.declarations.push(doc_decl);
+                        file_decl.v1_only_declarations.push(decl);
+                        file_decl.v1_only_declarations.push(doc_decl);
                         x.key.v1_file_id = file_id.into();
                         // @fb-only: Using xref.source.start as arity is a
                         // @fb-only: design choice - see D55916496. This should
@@ -836,8 +836,8 @@ impl GleanIndexer {
                                 }
                                 .into(),
                             );
-                            file_decl.declarations.push(decl);
-                            file_decl.declarations.push(doc_decl);
+                            file_decl.v1_only_declarations.push(decl);
+                            file_decl.v1_only_declarations.push(doc_decl);
                             x.key.v1_file_id = file_id.into();
                         }
                     }
@@ -1080,6 +1080,7 @@ impl GleanIndexer {
         Some(FileDeclaration {
             file_id: file_id.into(),
             declarations,
+            v1_only_declarations: vec![],
         })
     }
 

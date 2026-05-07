@@ -233,7 +233,11 @@ impl IndexedFacts {
         let mut comments = vec![];
         for decl in declaration_fact {
             if let Some(module) = modules.get(&decl.file_id) {
-                for d in decl.declarations {
+                for d in decl
+                    .declarations
+                    .into_iter()
+                    .chain(decl.v1_only_declarations)
+                {
                     let file_id = decl.file_id.clone();
                     if let Declaration::DocDeclaration(doc) = &d {
                         if doc.key.v1_skip {
@@ -569,7 +573,6 @@ impl IndexedFacts {
                         var_decls.push(decl.into());
                     }
                     Declaration::DocDeclaration(ref doc) => {
-                        // Convert doc to comment fact linked to the target declaration
                         if let Some(s2target) = self.decl_to_schema2(&doc.key.target, module, app) {
                             comments.push(
                                 Schema2CommentFact {

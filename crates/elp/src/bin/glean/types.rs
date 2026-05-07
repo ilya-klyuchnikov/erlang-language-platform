@@ -451,6 +451,8 @@ pub(crate) struct FileDeclaration {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
     pub(crate) declarations: Vec<Declaration>,
+    #[serde(skip)]
+    pub(crate) v1_only_declarations: Vec<Declaration>,
 }
 
 #[derive(Serialize, Debug, Clone)]

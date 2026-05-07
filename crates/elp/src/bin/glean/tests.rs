@@ -57,6 +57,7 @@ fn serialization_test() {
             }
             .into(),
         )],
+        v1_only_declarations: vec![],
     };
 
     let xref = XRefFile {
