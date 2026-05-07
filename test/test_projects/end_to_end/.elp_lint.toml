@@ -1,0 +1,2 @@
+[linters.compile-warn-missing-spec]
+enabled = true
