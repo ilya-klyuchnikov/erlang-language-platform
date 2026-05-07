@@ -427,6 +427,6 @@ error: reveal_type (See https://fb.me/eqwalizer_errors#reveal_type)
     ┌─ check/src/refine.erl:386:27
     │
 386 │     eqwalizer:reveal_type(A),
-    │                           ^ number()
+    │                           ^ alias()
 
 38 ERRORS
