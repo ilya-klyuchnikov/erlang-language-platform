@@ -892,6 +892,45 @@ mod tests {
     }
 
     #[test]
+    fn diagnostic_display_with_end_position() {
+        use elp_ide::elp_ide_db::elp_base_db::assert_eq_expected;
+
+        let diag = elp::arc_types::Diagnostic::new(
+            Path::new("src/foo.erl"),
+            42,
+            Some(10),
+            elp::arc_types::Severity::Warning,
+            "incompatible_types".to_string(),
+            "Expected integer(), got atom()".to_string(),
+            None,
+            None,
+        )
+        .with_end_position(43, 6);
+        assert_eq_expected!(
+            "warning: src/foo.erl:42:10-43:6 [incompatible_types]\n  Expected integer(), got atom()\n",
+            format!("{diag}")
+        );
+    }
+
+    #[test]
+    fn diagnostic_roundtrip_display_with_end_position() {
+        let diag = elp::arc_types::Diagnostic::new(
+            Path::new("src/foo.erl"),
+            42,
+            Some(10),
+            elp::arc_types::Severity::Warning,
+            "incompatible_types".to_string(),
+            "Expected integer(), got atom()".to_string(),
+            None,
+            None,
+        )
+        .with_end_position(43, 6);
+        let json = serde_json::to_string(&diag).unwrap();
+        let parsed: elp::arc_types::Diagnostic = serde_json::from_str(&json).unwrap();
+        assert_eq!(format!("{diag}"), format!("{parsed}"));
+    }
+
+    #[test]
     fn diagnostic_display_eqwalizer_format() {
         let desc = "```lang=error,counterexample\n`'error'`.\nExpression has type: 'error'\nContext expected type: 'ok'\n```\n\n> [docs on `incompatible_types`](https://fb.me/eqwalizer_errors#incompatible_types)";
         let diag = elp::arc_types::Diagnostic::new(

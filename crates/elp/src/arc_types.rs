@@ -67,9 +67,13 @@ impl fmt::Display for Severity {
 
 impl fmt::Display for Diagnostic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let loc = match self.char {
-            Some(c) => format!("{}:{}:{}", self.path, self.line.unwrap_or(0), c),
-            None => format!("{}:{}", self.path, self.line.unwrap_or(0)),
+        let line = self.line.unwrap_or(0);
+        let loc = match (self.char, self.end_line, self.end_char) {
+            (Some(c), Some(el), Some(ec)) => {
+                format!("{}:{}:{}-{}:{}", self.path, line, c, el, ec)
+            }
+            (Some(c), _, _) => format!("{}:{}:{}", self.path, line, c),
+            (None, _, _) => format!("{}:{}", self.path, line),
         };
         write!(f, "{}: {} [{}]", self.severity, loc, self.name)?;
         if let Some(desc) = &self.description {
