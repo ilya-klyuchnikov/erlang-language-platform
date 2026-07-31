@@ -631,6 +631,8 @@ final class Occurrence(pipelineContext: PipelineContext) {
         ConsType_*(restrict(h1, h2), restrict(tl1, tl2))
       case (_: FunType, _: FunType) =>
         narrow.meet(t1, t2)
+      case (FreeVarType(_), _) =>
+        subtype.inter(List(t1, t2))
       case (_, _) =>
         t1
     }
