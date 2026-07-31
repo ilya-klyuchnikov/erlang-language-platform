@@ -112,12 +112,11 @@ final class Check(pipelineContext: PipelineContext) {
   ): Env = {
     val patVars = Vars.clausePatVars(clause)
     val env1 = util.enterScope(env0, patVars)
-    // see D29637051 for why we elabGuard twice
-    val env2 = typeInfo.withoutTypeCollection {
-      elabGuard.elabGuards(clause.guards, env1)
-    }
+    // Refine guards before patterns (so refinements feed pattern elaboration)
+    // and again after (so leaves keep their post-pattern types).
+    val env2 = occurrence.refineGuards(clause.guards, env1)
     val (_, env3) = elabPat.elabPats(clause.pats, argTys, env2)
-    val env4 = elabGuard.elabGuards(clause.guards, env3)
+    val env4 = occurrence.refineGuards(clause.guards, env3)
     val hasEmptyType = env4.exists { case (_, ty) => Subtype.isNoneType(ty) }
     if (hasEmptyType && checkCoverage && (fullCoverage || !occurrence.clauseCovered(clause, argTys))) {
       diagnosticsInfo.add(ClauseNotCovered(clause.pos))
@@ -134,14 +133,11 @@ final class Check(pipelineContext: PipelineContext) {
   ): Unit = {
     val patVars = Vars.clausePatVars(clause)
     val env1 = util.enterScope(env, patVars)
-    val env2 = typeInfo.withoutTypeCollection {
-      elabGuard.elabGuards(clause.guards, env1)
-    }
+    val env2 = occurrence.refineGuards(clause.guards, env1)
     val (patTys, env3) = elabPat.elabPats(clause.pats, argTys, env2)
     val reachable = !patTys.exists(Subtype.isNoneType)
     if (reachable) {
-      // elabGuard twice for the same reasons as above, see D43679406
-      val env4 = elabGuard.elabGuards(clause.guards, env3)
+      val env4 = occurrence.refineGuards(clause.guards, env3)
       checkBody(clause.body, resTy, env4)
     }
   }

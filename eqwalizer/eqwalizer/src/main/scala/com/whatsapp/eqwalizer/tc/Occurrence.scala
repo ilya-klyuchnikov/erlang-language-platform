@@ -246,6 +246,15 @@ final class Occurrence(pipelineContext: PipelineContext) {
     batchSelect(env, List(relevantProp), Map.empty)
   }
 
+  // Refine an env by a clause's guards, refining variables by name (empty aMap).
+  // Run after elabPats so every pattern-bound variable is present; this is the
+  // occurrence-based replacement for the post-pattern elabGuard pass and covers
+  // leaves that dispatch-time env refinement cannot reach (e.g. values bound
+  // under a non-literal map key).
+  def refineGuards(guards: List[Guard], env: Env): Env =
+    if (guards.isEmpty) env
+    else batchSelect(env, guardsProps(guards, Map.empty)._1.toList, Map.empty)
+
   private def collectAtomic(p: Prop): List[AProp] =
     p match {
       case aProp: AProp => List(aProp)
