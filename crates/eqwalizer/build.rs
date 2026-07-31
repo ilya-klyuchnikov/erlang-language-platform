@@ -15,10 +15,10 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    let source_directory = Path::new("../../../eqwalizer/eqwalizer");
+    let source_directory = Path::new("../../eqwalizer/eqwalizer");
     let tools_dir = source_directory.join("tools");
     let out_dir = env::var_os("OUT_DIR").expect("OUT_DIR env var set by Cargo");
-    let eqwalizer_out_dir = Path::new("../../../../../buck-out/eqwalizer/scala-3.6.4");
+    let eqwalizer_out_dir = Path::new("../../eqwalizer/eqwalizer/target/scala-3.6.4");
     let dest_path = Path::new(&out_dir).join("eqwalizer");
     let extension;
     let java;
@@ -65,8 +65,7 @@ fn main() {
 }
 
 fn build_native_image(source_directory: &Path, eqwalizer_out_dir: &Path, jar: PathBuf) -> PathBuf {
-    let native_image = dunce::canonicalize(source_directory.join("./meta/native-image.sh"))
-        .expect("native-image.sh path exists");
+    let native_image = "native-image";
     let image_path = dunce::canonicalize(eqwalizer_out_dir)
         .expect("eqwalizer output dir exists")
         .join("eqwalizer");
@@ -92,11 +91,10 @@ fn build_native_image(source_directory: &Path, eqwalizer_out_dir: &Path, jar: Pa
 fn build_jar(source_directory: &Path, eqwalizer_out_dir: &Path) -> PathBuf {
     // Use the sbt wrapper on linux or otherwise require sbt to be installed
     let sbt =
-        dunce::canonicalize(source_directory.join("./meta/sbt.sh")).expect("sbt.sh path exists");
+        "sbt";
     let output = Command::new(sbt)
         .arg("assembly")
         .current_dir(source_directory)
-        .env("EQWALIZER_USE_BUCK_OUT", "true")
         .output()
         .expect("failed to execute sbt assembly");
 
