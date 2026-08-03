@@ -19,6 +19,14 @@ error: reference_to_invalid_type (See https://fb.me/eqwalizer_errors#reference_t
    │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ invalid (transitively) references type with invalid definition: loop/0
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+   ┌─ check/src/guards.erl:74:5
+   │
+74 │     T;
+   │     ^ T.
+Expression has type:   term()
+Context expected type: tuple()
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
    ┌─ check/src/guards.erl:89:25
    │
 89 │ guard_element_neg(T) -> T + 1.
@@ -26,4 +34,20 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   tuple()
 Context expected type: number()
 
-4 ERRORS
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+   ┌─ check/src/guards.erl:94:24
+   │
+94 │     when N =:= -1.0 -> N.
+   │                        ^ N.
+Expression has type:   atom() | number()
+Context expected type: number()
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+   ┌─ check/src/guards.erl:99:24
+   │
+99 │     when N =:= +1.0 -> N.
+   │                        ^ N.
+Expression has type:   atom() | number()
+Context expected type: number()
+
+7 ERRORS

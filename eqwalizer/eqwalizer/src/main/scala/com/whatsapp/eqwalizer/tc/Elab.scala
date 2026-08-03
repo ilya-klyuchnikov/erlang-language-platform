@@ -52,12 +52,11 @@ final class Elab(pipelineContext: PipelineContext) {
   ): (Type, Env) = {
     val patVars = Vars.clausePatVars(clause)
     val env1 = util.enterScope(env0, patVars)
-    // see D29637051 for why we elabGuard twice
-    val env2 = typeInfo.withoutTypeCollection {
-      elabGuard.elabGuards(clause.guards, env1)
-    }
+    // Refine guards before patterns (so refinements feed pattern elaboration)
+    // and again after (so leaves keep their post-pattern types).
+    val env2 = occurrence.refineGuards(clause.guards, env1)
     val (_, env3) = elabPat.elabPats(clause.pats, argTys, env2)
-    val env4 = elabGuard.elabGuards(clause.guards, env3)
+    val env4 = occurrence.refineGuards(clause.guards, env3)
     if (checkReachability && env4.exists { case (_, ty) => Subtype.isNoneType(ty) })
       return (NoneType, util.exitScope(env0, env4, exportedVars))
     val (eType, env5) = elabBody(clause.body, env4)

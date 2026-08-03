@@ -474,11 +474,19 @@ Expression has type:   number()
 Context expected type: integer()
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/numbers.erl:621:3
+    │
+621 │   X.
+    │   ^ X.
+Expression has type:   term()
+Context expected type: integer()
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/numbers.erl:625:3
     │
 625 │   X.
     │   ^ X.
-Expression has type:   number()
+Expression has type:   term()
 Context expected type: integer()
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
@@ -486,8 +494,16 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
     │
 629 │   X.
     │   ^ X.
-Expression has type:   number()
+Expression has type:   term()
 Context expected type: integer()
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/numbers.erl:633:3
+    │
+633 │   X.
+    │   ^ X.
+Expression has type:   term()
+Context expected type: number()
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/numbers.erl:644:3
@@ -518,4 +534,4 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   float()
 Context expected type: pid()
 
-62 ERRORS
+64 ERRORS
