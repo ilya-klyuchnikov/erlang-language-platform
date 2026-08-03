@@ -9,6 +9,7 @@ package com.whatsapp.eqwalizer.tc
 import com.whatsapp.eqwalizer.ast.TypeVars
 import com.whatsapp.eqwalizer.ast.Types.*
 
+import scala.annotation.tailrec
 import scala.util.boundary
 
 object Subtype {
@@ -18,6 +19,8 @@ object Subtype {
         true
       case UnionType(ts) =>
         ts.forall(isNoneType)
+      case InterType(ts) =>
+        ts.exists(isNoneType)
       case BoundedDynamicType(bound) =>
         isNoneType(bound)
       case _ =>
@@ -108,11 +111,17 @@ class Subtype(pipelineContext: PipelineContext) {
       case (UnionType(tys1), _) =>
         tys1.forall(subType(_, t2, seen))
 
+      case (InterType(tys1), _) =>
+        tys1.exists(subType(_, t2, seen))
+
       case (ty1: TupleType, ty2: UnionType) if ty1.argTys.nonEmpty =>
         ty1.argTys.zipWithIndex.exists { case (elem, i) => subtypeTuple(elem, ty2, i, ty1, seen) }
 
       case (_, UnionType(tys2)) =>
         tys2.exists(subType(t1, _, seen))
+
+      case (_, InterType(tys2)) =>
+        tys2.forall(subType(t1, _, seen))
 
       case (AtomLitType(_), AtomType) =>
         true
@@ -297,11 +306,17 @@ class Subtype(pipelineContext: PipelineContext) {
       case (UnionType(tys1), _) =>
         tys1.forall(subTypePol(_, t2, seen))
 
+      case (InterType(tys1), _) =>
+        tys1.exists(subTypePol(_, t2, seen))
+
       case (ty1: TupleType, ty2: UnionType) if ty1.argTys.nonEmpty =>
         ty1.argTys.zipWithIndex.exists { case (elem, i) => subtypeTuple(elem, ty2, i, ty1, seen) }
 
       case (_, UnionType(tys2)) =>
         tys2.exists(subTypePol(t1, _, seen))
+
+      case (_, InterType(tys2)) =>
+        tys2.forall(subTypePol(t1, _, seen))
 
       case (AtomLitType(_), AtomType) =>
         true
@@ -454,6 +469,8 @@ class Subtype(pipelineContext: PipelineContext) {
       case _ if t1 == t2 => true
       case UnionType(tys) =>
         tys.exists(containsType(t1, _))
+      case InterType(tys) =>
+        tys.forall(containsType(t1, _))
       case BoundedDynamicType(bound) =>
         containsType(t1, bound)
       case _ => false
@@ -466,6 +483,8 @@ class Subtype(pipelineContext: PipelineContext) {
       case _ if t1 == t2 => true
       case UnionType(tys) =>
         tys.exists(containsType(t1, _, p))
+      case InterType(tys) =>
+        tys.forall(containsType(t1, _, p))
       case BoundedDynamicType(bound) if p == + =>
         containsType(t1, bound, p)
       case _ => false
@@ -620,6 +639,27 @@ class Subtype(pipelineContext: PipelineContext) {
     }
   }
 
+  def inter(args: List[Type]): Type = {
+    @tailrec
+    def loop(elems: Set[Type], remaining: List[Type]): Type =
+      remaining match {
+        case Nil =>
+          InterType(elems)
+        case arg :: rest =>
+          arg match {
+            case AnyType =>
+              loop(elems, rest)
+            case InterType(ts) =>
+              loop(elems, ts.toList ++ rest)
+            case _ =>
+              if (rest.exists(overlap(_, arg).contains(false))) NoneType
+              else loop(elems + arg, rest)
+          }
+      }
+
+    loop(Set.empty, args)
+  }
+
   private def simpleOverlap(t1: Type, t2: Type): Option[Boolean] =
     (Subtype.kind(t1), Subtype.kind(t2)) match {
       case (Some(k1), Some(k2)) =>
@@ -692,6 +732,37 @@ class Subtype(pipelineContext: PipelineContext) {
             }
           }
           if (allFalse) Some(false) else None
+        }
+
+      case (InterType(ts), _) =>
+        boundary {
+          var allTrue = true
+          for (t1 <- ts) {
+            overlap(t1, t2, seen) match {
+              case Some(false) =>
+                boundary.break(Some(false))
+              case None =>
+                allTrue = false
+              case Some(true) =>
+                ()
+            }
+          }
+          if (allTrue) Some(true) else None
+        }
+      case (_, InterType(ts)) =>
+        boundary {
+          var allTrue = true
+          for (t2 <- ts) {
+            overlap(t1, t2, seen) match {
+              case Some(false) =>
+                boundary.break(Some(false))
+              case None =>
+                allTrue = false
+              case Some(true) =>
+                ()
+            }
+          }
+          if (allTrue) Some(true) else None
         }
 
       case (NativeRecordType(id1), NativeRecordType(id2)) =>
@@ -954,6 +1025,10 @@ class Subtype(pipelineContext: PipelineContext) {
           join(ty1s.map(meetAux(_, t2, seen)))
         case (_, UnionType(ty2s)) =>
           join(ty2s.map(meetAux(t1, _, seen)))
+        case (InterType(ty1s), _) =>
+          inter(ty1s.toList.map(meetAux(_, t2, seen)))
+        case (_, InterType(ty2s)) =>
+          inter(ty2s.toList.map(meetAux(t1, _, seen)))
         case (TupleType(elems1), TupleType(elems2)) if elems1.size == elems2.size =>
           val elems = elems1.zip(elems2).map { (a, b) => meetAux(a, b, seen) }
           TupleType_*(elems)

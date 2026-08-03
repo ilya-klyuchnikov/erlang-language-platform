@@ -51,6 +51,7 @@ object TypeVars {
     case AnyArityFunType(resTy)       => resTy :: Nil
     case TupleType(argTys)            => argTys
     case UnionType(tys)               => tys.toList
+    case InterType(tys)               => tys.toList
     case RemoteType(_, tys)           => tys
     case MapType(props, kType, vType) => kType :: vType :: props.values.map(_.tp).toList
     case ListType(ty)                 => ty :: Nil
@@ -80,6 +81,8 @@ object TypeVars {
       ConsType(substLevels(shift)(headT), substLevels(shift)(tailT))
     case UnionType(params) =>
       UnionType(params.map(substLevels(shift)))
+    case InterType(params) =>
+      InterType(params.map(substLevels(shift)))
     case RemoteType(id, params) =>
       RemoteType(id, params.map(substLevels(shift)))
     case MapType(props, kt, vt) =>
@@ -124,6 +127,8 @@ object TypeVars {
         ConsType(elim(headT), elim(tailT))
       case UnionType(params) =>
         UnionType(params.map(elim))
+      case InterType(params) =>
+        InterType(params.map(elim))
       case RemoteType(id, params) =>
         val variances = Variance.paramVariances(id)
         val elimmedParams = params.lazyZip(variances).map {
