@@ -474,36 +474,36 @@ Expression has type:   number()
 Context expected type: integer()
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/numbers.erl:621:3
-    │
-621 │   X.
-    │   ^ X.
-Expression has type:   term()
-Context expected type: integer()
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/numbers.erl:625:3
     │
 625 │   X.
-    │   ^ X.
-Expression has type:   term()
+    │   ^
+    │   │
+    │   X.
+Expression has type:   float() | integer()
 Context expected type: integer()
+    │   
+
+Because in the expression's type:
+  Here the type is a union type with some valid candidates: integer()
+  However the following candidate: float()
+  Differs from the expected type:  integer()
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/numbers.erl:629:3
     │
 629 │   X.
-    │   ^ X.
-Expression has type:   term()
+    │   ^
+    │   │
+    │   X.
+Expression has type:   float() | integer()
 Context expected type: integer()
+    │   
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/numbers.erl:633:3
-    │
-633 │   X.
-    │   ^ X.
-Expression has type:   term()
-Context expected type: number()
+Because in the expression's type:
+  Here the type is a union type with some valid candidates: integer()
+  However the following candidate: float()
+  Differs from the expected type:  integer()
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/numbers.erl:644:3
@@ -534,4 +534,4 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   float()
 Context expected type: pid()
 
-64 ERRORS
+62 ERRORS

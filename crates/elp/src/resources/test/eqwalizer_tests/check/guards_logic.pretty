@@ -1,20 +1,4 @@
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/guards_logic.erl:15:25
-   │
-15 │ test02(X) when not X -> X;
-   │                         ^ X.
-Expression has type:   atom()
-Context expected type: boolean()
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/guards_logic.erl:23:33
-   │
-23 │ test04(X, Y) when X orelse Y -> X.
-   │                                 ^ X.
-Expression has type:   atom()
-Context expected type: boolean()
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
    ┌─ check/src/guards_logic.erl:32:38
    │
 32 │ test07_neg(X, Y) when X andalso Y -> Y.
@@ -47,39 +31,6 @@ Because in the expression's type:
   Differs from the expected type:  atom() | float() | integer()
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/guards_logic.erl:60:32
-   │
-60 │ test12(X, _) when X + 1 > 0 -> X;
-   │                                ^ X.
-Expression has type:   term()
-Context expected type: number()
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/guards_logic.erl:61:32
-   │
-61 │ test12(_, Y) when Y / 3 > 1 -> Y.
-   │                                ^ Y.
-Expression has type:   term()
-Context expected type: number()
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/guards_logic.erl:67:5
-   │
-67 │     {X, Y}.
-   │     ^^^^^^
-   │     │
-   │     {X, Y}.
-Expression has type:   {term(), term()}
-Context expected type: {number(), number()}
-   │     
-
-Because in the expression's type:
-  { 
-    Here the type is:     term()
-    Context expects type: number()
-  , term()}
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
    ┌─ check/src/guards_logic.erl:73:5
    │
 73 │     {X, Y}.
@@ -97,39 +48,6 @@ Because in the expression's type:
   , term()}
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/guards_logic.erl:78:32
-   │
-78 │ test15(X, Y) when X + Y > 0 -> {X, Y};
-   │                                ^^^^^^
-   │                                │
-   │                                {X, Y}.
-Expression has type:   {term(), term()}
-Context expected type: {boolean(), boolean()} | {number(), number()}
-   │                                
-
-Because in the expression's type:
-  { 
-    Here the type is:     term()
-    Context expects type: number()
-  , term()}
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/guards_logic.erl:86:41
-   │
-86 │ test17(X, Y) when (X and Y) == false -> Y.
-   │                                         ^ Y.
-Expression has type:   atom()
-Context expected type: boolean()
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/guards_logic.erl:89:29
-   │
-89 │ test18(X, Y) when X or Y -> Y.
-   │                             ^ Y.
-Expression has type:   atom()
-Context expected type: boolean()
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/guards_logic.erl:101:46
     │
 101 │ test21_neg(X) when (X =:= a) or (X =:= b) -> X.
@@ -137,4 +55,4 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   'a' | 'b'
 Context expected type: 'c'
 
-13 ERRORS
+5 ERRORS

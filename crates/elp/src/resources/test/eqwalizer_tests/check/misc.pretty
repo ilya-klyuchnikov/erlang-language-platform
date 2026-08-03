@@ -253,40 +253,6 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   fun((boolean()) -> boolean())
 Context expected type: 'atom'
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/misc.erl:178:36
-    │
-178 │ test37_pos(X, Y) when X + Y > 0 -> {X, Y}.
-    │                                    ^^^^^^
-    │                                    │
-    │                                    {X, Y}.
-Expression has type:   {term(), term()}
-Context expected type: {number(), number()}
-    │                                    
-
-Because in the expression's type:
-  { 
-    Here the type is:     term()
-    Context expects type: number()
-  , term()}
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/misc.erl:182:34
-    │
-182 │ test38_pos(X) when bnot X > 0 -> {X}.
-    │                                  ^^^
-    │                                  │
-    │                                  {X}.
-Expression has type:   {term()}
-Context expected type: {number()}
-    │                                  
-
-Because in the expression's type:
-  { 
-    Here the type is:     term()
-    Context expects type: number()
-  }
-
 error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
     ┌─ check/src/misc.erl:192:1
     │
@@ -299,13 +265,11 @@ error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered
 196 │ test41_pos([X | Y]) -> {X, Y}.
     │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Clause is not covered by spec
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/misc.erl:204:39
+error: clause_not_covered (See https://fb.me/eqwalizer_errors#clause_not_covered)
+    ┌─ check/src/misc.erl:204:1
     │
 204 │ test43_pos([_ | Y]) when Y + 1 > 0 -> Y.
-    │                                       ^ Y.
-Expression has type:   [term()]
-Context expected type: none()
+    │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Clause is not covered by spec
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/misc.erl:221:17
@@ -892,4 +856,4 @@ error: non_exported_id (See https://fb.me/eqwalizer_errors#non_exported_id)
 1011 │ -type non_exported_id_t() :: any_fun_type:f1().
      │                              ^^^^^^^^^^^^^^^^^ Type exists but is not exported: any_fun_type:f1/0
 
-92 ERRORS
+90 ERRORS

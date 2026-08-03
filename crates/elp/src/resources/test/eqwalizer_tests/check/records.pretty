@@ -102,27 +102,11 @@ Because in the expression's type:
   , integer()}
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/records.erl:140:28
-    │
-140 │     when Foo#foo.id > 0 -> Foo.
-    │                            ^^^ Foo.
-Expression has type:   term()
-Context expected type: #foo{}
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/records.erl:149:37
-    │
-149 │     when Foo == #foo_def{id = X} -> X.
-    │                                     ^ X.
-Expression has type:   term()
-Context expected type: number()
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/records.erl:154:37
     │
 154 │     when Foo == #foo_def{id = X} -> X.
     │                                     ^ X.
-Expression has type:   term()
+Expression has type:   integer()
 Context expected type: atom()
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
@@ -539,4 +523,4 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   #{a := 'b', dynamic() => dynamic()}
 Context expected type: 'ok'
 
-52 ERRORS
+50 ERRORS

@@ -23,6 +23,22 @@ object Occurrence {
   type AProp = Pos | Neg
   private val nType = UnionType(Set(IntegerType, FloatType))
 
+  // Three-outcome semantics of a guard test: it evaluates to `true`,
+  // it evaluates (without throwing) to a non-`true` value, or it throws.
+  //   tt    - holds when the test evaluates to `true`
+  //   ff    - holds when the test evaluates, without throwing, to non-`true`
+  //   ev    - holds whenever the test evaluates without throwing, whatever
+  //           the result: `X + Y > 0` having evaluated implies X, Y :: number()
+  //   total - evaluation can never throw
+  //   bool  - if evaluation succeeds, the result is a boolean
+  // Invariant: tt and ff each conjoin ev.
+  private case class TP(tt: Prop, ff: Prop, ev: Prop, total: Boolean, bool: Boolean) {
+    // Knowledge available when a clause was skipped over this test: it
+    // evaluated to non-`true` or it threw. A throw reveals nothing about the
+    // arguments, so a non-total test contributes no negative information.
+    def notTaken: Prop = if (total) ff else Unknown
+  }
+
   private def flattenAnd(p: Prop): List[SProp | Or] = p match {
     case And(l)          => l.flatMap(flattenAnd)
     case True            => List()
@@ -240,9 +256,13 @@ final class Occurrence(pipelineContext: PipelineContext) {
     clauseEnvs.toList
   }
 
+  // Refine an env knowing that `test` was evaluated - in expression position,
+  // so a throw would have propagated - and produced `result`. `result = false`
+  // therefore implies the test evaluated to boolean `false` (stronger than a
+  // guard clause being skipped, which could also mean the test threw).
   def testEnv(test: Test, env: Env, result: Boolean): Env = {
-    val (testPos, testNeg) = testProps(test, Map.empty)
-    val relevantProp = if (result) testPos else testNeg
+    val tp = testProps(test, Map.empty)
+    val relevantProp = if (result) tp.tt else bff(test, tp, Map.empty)
     batchSelect(env, List(relevantProp), Map.empty)
   }
 
@@ -356,9 +376,9 @@ final class Occurrence(pipelineContext: PipelineContext) {
     }
 
   private def guardProp(guard: Guard, aMap: Map[Name, Obj]): (Prop, Prop) = {
-    // the same as connecting via AND
-    val (pos, neg) = guard.tests.map(testProps(_, aMap)).unzip
-    (and(pos), or(neg))
+    // tests connect via AND; the guard is not taken when some test is not taken
+    val tps = guard.tests.map(testProps(_, aMap))
+    (and(tps.map(_.tt)), or(tps.map(_.notTaken)))
   }
 
   private def testObj(test: Test, aMap: Map[Name, Obj]): Option[Obj] = {
@@ -391,6 +411,8 @@ final class Occurrence(pipelineContext: PipelineContext) {
       case TestInteger(_)  => (Some(IntegerType), None)
       case TestFloat()     => (Some(FloatType), None)
       case TestString()    => (Some(ListType(charType)), None)
+      // signed numeric literals, e.g. `X =:= -1.0`
+      case TestUnOp("-" | "+", TestInteger(_) | TestFloat()) => (Some(nType), None)
       case TestTuple(tests) =>
         val (pos, neg) = tests.map(cmpTypes).unzip
         (unzipOpt(pos).map(TupleType(_)), unzipOpt(neg).map(TupleType(_)))
@@ -398,61 +420,167 @@ final class Occurrence(pipelineContext: PipelineContext) {
     }
   }
 
-  private def cmpProps(obj: Obj, test: Test): (Prop, Prop) = {
-    val (posTy, negTy) = cmpTypes(test)
-    val pos = posTy.map(Pos(obj, _)).getOrElse(Unknown)
-    val neg = negTy.map(Neg(obj, _)).getOrElse(Unknown)
-    (pos, neg)
+  private def cmpProps(obj: Obj, test: Test, aMap: AMap): (Prop, Prop) = {
+    test match {
+      case rc: TestRecordCreate =>
+        (recordCreateEqProps(rc, obj, aMap), Unknown)
+      case _ =>
+        val (posTy, negTy) = cmpTypes(test)
+        val pos = posTy.map(Pos(obj, _)).getOrElse(Unknown)
+        val neg = negTy.map(Neg(obj, _)).getOrElse(Unknown)
+        (pos, neg)
+    }
+  }
+
+  // `obj == #rec{f = V, ...}` succeeding implies obj :: #rec{} and, for every
+  // trackable field value V, V :: <declared type of f>.
+  private def recordCreateEqProps(rc: TestRecordCreate, obj: Obj, aMap: AMap): Prop = {
+    val recProp = Pos(obj, RecordType(rc.recName)(module))
+    val fieldProps =
+      util.getRecord(module, rc.recName) match {
+        case None =>
+          List()
+        case Some(recDecl) =>
+          val named = rc.fields.collect { case f: TestRecordFieldNamed => f }
+          val namedProps =
+            named.flatMap { f =>
+              recDecl.fMap.get(f.name).flatMap(fDecl => testObj(f.value, aMap).map(Pos(_, fDecl.tp)))
+            }
+          val genProps =
+            rc.fields.collectFirst { case f: TestRecordFieldGen => f } match {
+              case None =>
+                List()
+              case Some(genField) =>
+                testObj(genField.value, aMap) match {
+                  case None =>
+                    List()
+                  case Some(genObj) =>
+                    recDecl.fields
+                      .filter(fDecl => !named.exists(_.name == fDecl._1))
+                      .map(fDecl => Pos(genObj, fDecl._2))
+                }
+            }
+          namedProps ++ genProps
+      }
+    and(recProp :: fieldProps)
   }
 
   // Equality narrowing is symmetric in operand order: refine whichever side is a
   // tracked object against the other side's value (e.g. both `X =:= a` and `a =:= X`).
   private def eqProps(test1: Test, test2: Test, aMap: Map[Name, Obj]): (Prop, Prop) =
     testObj(test1, aMap)
-      .map(cmpProps(_, test2))
-      .orElse(testObj(test2, aMap).map(cmpProps(_, test1)))
+      .map(cmpProps(_, test2, aMap))
+      .orElse(testObj(test2, aMap).map(cmpProps(_, test1, aMap)))
       .getOrElse((Unknown, Unknown))
 
-  private def testProps(test: Test, aMap: Map[Name, Obj]): (Prop, Prop) = {
+  // A test whose result can be anything and whose own evaluation may throw;
+  // `ev` carries whatever is known from its sub-evaluations.
+  private def opaque(ev: Prop): TP =
+    TP(ev, ev, ev, total = false, bool = false)
+
+  // A test that evaluates its components but can never be `true`
+  // (tuples, conses, map/record literals, numbers, ...).
+  private def neverTrue(args: List[Test], aMap: AMap): TP = {
+    val tps = args.map(testProps(_, aMap))
+    val ev = and(tps.map(_.ev))
+    TP(False, ev, ev, total = tps.forall(_.total), bool = false)
+  }
+
+  private def objProp(test: Test, aMap: AMap, ty: Type): Prop =
+    testObj(test, aMap).map(Pos(_, ty)).getOrElse(True)
+
+  private def objProps(test: Test, aMap: AMap, ty: Type): (Prop, Prop) =
+    testObj(test, aMap) match {
+      case Some(obj) => (Pos(obj, ty), Neg(obj, ty))
+      case None      => (True, True)
+    }
+
+  // Facts implied by `test` having been evaluated, without throwing, in a
+  // position that requires type `ty` (the enclosing operation throws otherwise).
+  private def evIn(test: Test, ty: Type, aMap: AMap): Prop =
+    and(List(testProps(test, aMap).ev, objProp(test, aMap, ty)))
+
+  // "the result of `test`, if any, is a boolean" - structurally when tp.bool,
+  // as a proposition when the test is a trackable object, no info otherwise
+  private def boolFact(test: Test, tp: TP, aMap: AMap): Prop =
+    if (tp.bool) True
+    else objProp(test, aMap, booleanType)
+
+  // "evaluated to boolean `false`": non-true plus boolean-ness of the result
+  private def bff(test: Test, tp: TP, aMap: AMap): Prop =
+    and(List(tp.ff, boolFact(test, tp, aMap)))
+
+  // A total type-test on `arg`: true iff `arg` has type `ty`, throws only if
+  // evaluating `arg` throws.
+  private def typeTest(arg: Test, ty: Type, aMap: AMap): TP = {
+    val tpArg = testProps(arg, aMap)
+    val (pos, neg) = objProps(arg, aMap, ty)
+    TP(and(List(pos, tpArg.ev)), and(List(neg, tpArg.ev)), tpArg.ev, total = tpArg.total, bool = true)
+  }
+
+  private def testProps(test: Test, aMap: Map[Name, Obj]): TP = {
     test match {
-      case TestVar(_) =>
-        // A bare variable guard succeeds iff the variable is `true`.
-        testObj(test, aMap)
-          .map(obj => (Pos(obj, trueType), Neg(obj, trueType)))
-          .getOrElse(Unknown, Unknown)
+      // literals evaluate to themselves and never throw
+      case TestAtom("true") =>
+        TP(True, False, True, total = true, bool = true)
+      case TestAtom("false") =>
+        TP(False, True, True, total = true, bool = true)
+      case TestAtom(_) | TestInteger(_) | TestFloat() | TestString() | TestNil() | TestBinaryLit() |
+          TestRecordIndex(_, _) =>
+        TP(False, True, True, total = true, bool = false)
+      case TestVar(v) =>
+        // a bare variable test passes iff the variable is `true`
+        val obj = aMap.getOrElse(v, VarObj(v))
+        TP(Pos(obj, trueType), Neg(obj, trueType), True, total = true, bool = false)
+      // structured literals: never `true`, their components are evaluated
+      case TestTuple(elems) =>
+        neverTrue(elems, aMap)
+      case TestCons(h, t) =>
+        neverTrue(List(h, t), aMap)
+      case TestMapCreate(kvs) =>
+        neverTrue(kvs.flatMap { case (k, v) => List(k, v) }, aMap)
+      case TestRecordCreate(_, fields) =>
+        neverTrue(fields.map(_.value), aMap)
+      case TestRecordSelect(rec, recName, _) =>
+        // selection throws unless `rec` is a #recName{}
+        val tpRec = testProps(rec, aMap)
+        val ev = and(List(tpRec.ev, objProp(rec, aMap, RecordType(recName)(module))))
+        val (pos, neg) = objProps(test, aMap, trueType)
+        TP(and(List(pos, ev)), and(List(neg, ev)), ev, total = false, bool = false)
+      case TestNativeRecordSelect(rec, _, _) =>
+        opaque(testProps(rec, aMap).ev)
+      case TestMapUpdate(map, kvs) =>
+        // update throws unless `map` is a map
+        val tpMap = testProps(map, aMap)
+        val kvTps = kvs.flatMap { case (k, v) => List(k, v) }.map(testProps(_, aMap))
+        val ev = and(objProp(map, aMap, MapType(Map(), AnyType, AnyType)) :: tpMap.ev :: kvTps.map(_.ev))
+        TP(False, ev, ev, total = false, bool = false)
       case TestCall(Id(pred, 1), List(arg)) if unary_predicates.isDefinedAt(pred) =>
-        val tp = unary_predicates(pred)
-        testObj(arg, aMap)
-          .map(obj => (Pos(obj, tp), Neg(obj, tp)))
-          .getOrElse(Unknown, Unknown)
+        typeTest(arg, unary_predicates(pred), aMap)
       case TestCall(Id("is_function", 2), List(arg, TestInteger(Some(arity)))) =>
         val tPos = FunType(0, List.fill(arity.intValue)(AnyType), AnyType)
         val tNeg = FunType(0, List.fill(arity.intValue)(NoneType), AnyType)
-        testObj(arg, aMap)
-          .map(obj => (Pos(obj, tPos), Neg(obj, tNeg)))
-          .getOrElse(Unknown, Unknown)
+        val tpArg = testProps(arg, aMap)
+        val pos = testObj(arg, aMap).map(Pos(_, tPos)).getOrElse(True)
+        val neg = testObj(arg, aMap).map(Neg(_, tNeg)).getOrElse(True)
+        TP(and(List(pos, tpArg.ev)), and(List(neg, tpArg.ev)), tpArg.ev, total = tpArg.total, bool = true)
       case TestCall(Id("is_function", 2), List(arg, _)) =>
-        // Non-literal arity: narrow to any fun; the arity is unknown so there is
-        // no precise negative.
-        testObj(arg, aMap)
-          .map(obj => (Pos(obj, AnyFunType), Unknown))
-          .getOrElse(Unknown, Unknown)
+        // non-literal arity: narrow to any fun; evaluation may throw on a bad
+        // arity argument, and there is no precise negative
+        val tpArg = testProps(arg, aMap)
+        val pos = objProp(arg, aMap, AnyFunType)
+        TP(and(List(pos, tpArg.ev)), tpArg.ev, tpArg.ev, total = false, bool = true)
       case TestCall(Id("is_record", 3), List(arg, TestAtom(modName), TestAtom(recName))) =>
-        val tp = nativeRecordTypeFor(modName, recName)
-        testObj(arg, aMap)
-          .map(obj => (Pos(obj, tp), Neg(obj, tp)))
-          .getOrElse(Unknown, Unknown)
+        typeTest(arg, nativeRecordTypeFor(modName, recName), aMap)
       case TestCall(Id("is_record", 2), List(arg, TestAtom(recName))) =>
-        val tp = resolveIsRecord2Name(recName)
-        testObj(arg, aMap)
-          .map(obj => (Pos(obj, tp), Neg(obj, tp)))
-          .getOrElse(Unknown, Unknown)
-      case TestCall(Id("is_record", 3), arg :: TestAtom(recName) :: _) =>
-        val tp = RecordType(recName)(module)
-        testObj(arg, aMap)
-          .map(obj => (Pos(obj, tp), Neg(obj, tp)))
-          .getOrElse(Unknown, Unknown)
+        typeTest(arg, resolveIsRecord2Name(recName), aMap)
+      case TestCall(Id("is_record", 3), arg :: TestAtom(recName) :: rest) =>
+        val base = typeTest(arg, RecordType(recName)(module), aMap)
+        val litArity = rest.forall { case TestInteger(Some(_)) => true; case _ => false }
+        if (litArity) base else base.copy(total = false)
       case TestCall(Id("is_map_key", 2), List(keyArg, mapArg)) =>
+        val tpKey = testProps(keyArg, aMap)
+        val tpMap = testProps(mapArg, aMap)
         val mapKT = mapArg match {
           case TestMapCreate(kvs) if kvs.nonEmpty =>
             val keys = kvs.map { case (k, _) => Key.fromTest(k) }
@@ -460,31 +588,99 @@ final class Occurrence(pipelineContext: PipelineContext) {
           case _ =>
             None
         }
-        val pos = mapKT match {
-          // is_map_key(K, #{k1 => .., k2 => ....}) -> K :: k1 | k2 | ...
-          case Some(keyTy) =>
-            testObj(keyArg, aMap).map(Pos(_, keyTy))
-          // `is_map_key(K, M)` -> M :: #{term() => term()}
-          case None =>
-            testObj(mapArg, aMap).map(Pos(_, MapType(Map(), AnyType, AnyType)))
-        }
-        (pos.getOrElse(Unknown), Unknown)
-      case TestUnOp("not", test) =>
-        testProps(test, aMap).swap
-      case TestBinOp("and" | "andalso", test1, test2) =>
-        val (pos1, neg1) = testProps(test1, aMap)
-        val (pos2, neg2) = testProps(test2, aMap)
-        (and(List(pos1, pos2)), or(List(neg1, neg2)))
-      case TestBinOp("or" | "orelse", test1, test2) =>
-        val (pos1, neg1) = testProps(test1, aMap)
-        val (pos2, neg2) = testProps(test2, aMap)
-        (or(List(pos1, pos2)), and(List(neg1, neg2)))
-      case TestBinOp("==" | "=:=", test1, test2) =>
-        eqProps(test1, test2, aMap)
-      case TestBinOp("=/=" | "/=", test1, test2) =>
-        eqProps(test1, test2, aMap).swap
-      case _ =>
-        (Unknown, Unknown)
+        // `is_map_key(K, M)` throws unless M is a map
+        val ev = and(List(tpKey.ev, tpMap.ev, objProp(mapArg, aMap, MapType(Map(), AnyType, AnyType))))
+        // is_map_key(K, #{k1 => .., k2 => ....}) -> K :: k1 | k2 | ...
+        val keyFact = mapKT.flatMap(keyTy => testObj(keyArg, aMap).map(Pos(_, keyTy))).getOrElse(True)
+        TP(and(List(keyFact, ev)), ev, ev, total = false, bool = true)
+      case TestCall(Id("element", 2), List(idx, tup)) =>
+        // element/2 throws unless `idx` is an integer and `tup` a tuple
+        val ev = and(List(evIn(idx, IntegerType, aMap), evIn(tup, AnyTupleType, aMap)))
+        val (pos, neg) = objProps(test, aMap, trueType)
+        TP(and(List(pos, ev)), and(List(neg, ev)), ev, total = false, bool = false)
+      case TestCall(Id("hd" | "tl", 1), List(arg)) =>
+        val ev = evIn(arg, ListType(AnyType), aMap)
+        val (pos, neg) = objProps(test, aMap, trueType)
+        TP(and(List(pos, ev)), and(List(neg, ev)), ev, total = false, bool = false)
+      case TestCall(_, args) =>
+        // unknown guard BIF: outcome unknown, but its arguments were evaluated
+        opaque(and(args.map(testProps(_, aMap).ev)))
+      case TestUnOp("not", arg) =>
+        val tpArg = testProps(arg, aMap)
+        val bf = boolFact(arg, tpArg, aMap)
+        val ev = and(List(tpArg.ev, bf))
+        TP(and(List(tpArg.ff, bf)), and(List(tpArg.tt, bf)), ev, total = tpArg.total && tpArg.bool, bool = true)
+      case TestUnOp("bnot", arg) =>
+        val ev = evIn(arg, IntegerType, aMap)
+        TP(False, ev, ev, total = false, bool = false)
+      case TestUnOp("+" | "-", arg) =>
+        val ev = evIn(arg, nType, aMap)
+        TP(False, ev, ev, total = false, bool = false)
+      case TestUnOp(_, arg) =>
+        opaque(testProps(arg, aMap).ev)
+      case TestBinOp("and", arg1, arg2) =>
+        val tp1 = testProps(arg1, aMap)
+        val tp2 = testProps(arg2, aMap)
+        val ev = and(List(tp1.ev, boolFact(arg1, tp1, aMap), tp2.ev, boolFact(arg2, tp2, aMap)))
+        val tt = and(List(tp1.tt, tp2.tt, ev))
+        val ff = and(List(ev, or(List(tp1.ff, tp2.ff))))
+        TP(tt, ff, ev, total = tp1.total && tp2.total && tp1.bool && tp2.bool, bool = true)
+      case TestBinOp("or", arg1, arg2) =>
+        val tp1 = testProps(arg1, aMap)
+        val tp2 = testProps(arg2, aMap)
+        val ev = and(List(tp1.ev, boolFact(arg1, tp1, aMap), tp2.ev, boolFact(arg2, tp2, aMap)))
+        val tt = and(List(ev, or(List(tp1.tt, tp2.tt))))
+        val ff = and(List(ev, tp1.ff, tp2.ff))
+        TP(tt, ff, ev, total = tp1.total && tp2.total && tp1.bool && tp2.bool, bool = true)
+      case TestBinOp("xor", arg1, arg2) =>
+        val tp1 = testProps(arg1, aMap)
+        val tp2 = testProps(arg2, aMap)
+        val ev = and(List(tp1.ev, boolFact(arg1, tp1, aMap), tp2.ev, boolFact(arg2, tp2, aMap)))
+        val tt = and(List(ev, or(List(and(List(tp1.tt, tp2.ff)), and(List(tp1.ff, tp2.tt))))))
+        val ff = and(List(ev, or(List(and(List(tp1.tt, tp2.tt)), and(List(tp1.ff, tp2.ff))))))
+        TP(tt, ff, ev, total = tp1.total && tp2.total && tp1.bool && tp2.bool, bool = true)
+      case TestBinOp("andalso", arg1, arg2) =>
+        val tp1 = testProps(arg1, aMap)
+        val tp2 = testProps(arg2, aMap)
+        // arg1 is always evaluated and must be a boolean; arg2 only when arg1 is true
+        val ev = and(List(tp1.ev, boolFact(arg1, tp1, aMap)))
+        val tt = and(List(tp1.tt, tp2.tt, ev))
+        val ff = and(List(ev, or(List(bff(arg1, tp1, aMap), and(List(tp1.tt, tp2.ff))))))
+        TP(tt, ff, ev, total = tp1.total && tp1.bool && tp2.total, bool = tp2.bool)
+      case TestBinOp("orelse", arg1, arg2) =>
+        val tp1 = testProps(arg1, aMap)
+        val tp2 = testProps(arg2, aMap)
+        // arg1 is always evaluated and must be a boolean; arg2 only when arg1 is false
+        val ev = and(List(tp1.ev, boolFact(arg1, tp1, aMap)))
+        val tt = and(List(ev, or(List(tp1.tt, and(List(bff(arg1, tp1, aMap), tp2.tt))))))
+        val ff = and(List(ev, bff(arg1, tp1, aMap), tp2.ff))
+        TP(tt, ff, ev, total = tp1.total && tp1.bool && tp2.total, bool = tp2.bool)
+      case TestBinOp("+" | "-" | "*" | "/", arg1, arg2) =>
+        val ev = and(List(evIn(arg1, nType, aMap), evIn(arg2, nType, aMap)))
+        TP(False, ev, ev, total = false, bool = false)
+      case TestBinOp("div" | "rem" | "band" | "bor" | "bxor" | "bsl" | "bsr", arg1, arg2) =>
+        val ev = and(List(evIn(arg1, IntegerType, aMap), evIn(arg2, IntegerType, aMap)))
+        TP(False, ev, ev, total = false, bool = false)
+      case TestBinOp("==" | "=:=", arg1, arg2) =>
+        val tp1 = testProps(arg1, aMap)
+        val tp2 = testProps(arg2, aMap)
+        val (pos, neg) = eqProps(arg1, arg2, aMap)
+        val ev = and(List(tp1.ev, tp2.ev))
+        TP(and(List(pos, ev)), and(List(neg, ev)), ev, total = tp1.total && tp2.total, bool = true)
+      case TestBinOp("=/=" | "/=", arg1, arg2) =>
+        val tp1 = testProps(arg1, aMap)
+        val tp2 = testProps(arg2, aMap)
+        val (pos, neg) = eqProps(arg1, arg2, aMap)
+        val ev = and(List(tp1.ev, tp2.ev))
+        TP(and(List(neg, ev)), and(List(pos, ev)), ev, total = tp1.total && tp2.total, bool = true)
+      case TestBinOp("<" | "=<" | ">" | ">=", arg1, arg2) =>
+        // term ordering never throws, but the operands are still evaluated
+        val tp1 = testProps(arg1, aMap)
+        val tp2 = testProps(arg2, aMap)
+        val ev = and(List(tp1.ev, tp2.ev))
+        TP(ev, ev, ev, total = tp1.total && tp2.total, bool = true)
+      case TestBinOp(_, arg1, arg2) =>
+        opaque(and(List(testProps(arg1, aMap).ev, testProps(arg2, aMap).ev)))
     }
   }
 
