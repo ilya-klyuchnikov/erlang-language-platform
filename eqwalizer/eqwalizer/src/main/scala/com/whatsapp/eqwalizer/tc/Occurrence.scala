@@ -25,18 +25,20 @@ object Occurrence {
 
   // Three-outcome semantics of a guard test: it evaluates to `true`,
   // it evaluates (without throwing) to a non-`true` value, or it throws.
-  //   tt    - holds when the test evaluates to `true`
-  //   ff    - holds when the test evaluates, without throwing, to non-`true`
-  //   ev    - holds whenever the test evaluates without throwing, whatever
-  //           the result: `X + Y > 0` having evaluated implies X, Y :: number()
-  //   total - evaluation can never throw
-  //   bool  - if evaluation succeeds, the result is a boolean
+  //   tt   - holds when the test evaluates to `true`
+  //   ff   - holds when the test evaluates, without throwing, to non-`true`
+  //   ev   - holds whenever the test evaluates without throwing, whatever
+  //          the result: `X + Y > 0` having evaluated implies X, Y :: number()
+  //   th   - holds when evaluation threw: the test's throw-domain
+  //          (`hd(L)` threw implies L is [] or not a list). False means the
+  //          test is total; Unknown means the throw-cause is inexpressible.
+  //   bool - if evaluation succeeds, the result is a boolean
   // Invariant: tt and ff each conjoin ev.
-  private case class TP(tt: Prop, ff: Prop, ev: Prop, total: Boolean, bool: Boolean) {
+  private case class TP(tt: Prop, ff: Prop, ev: Prop, th: Prop, bool: Boolean) {
     // Knowledge available when a clause was skipped over this test: it
-    // evaluated to non-`true` or it threw. A throw reveals nothing about the
-    // arguments, so a non-total test contributes no negative information.
-    def notTaken: Prop = if (total) ff else Unknown
+    // evaluated to non-`true` or it threw. An inexpressible throw-domain
+    // (th = Unknown) absorbs the disjunction - no negative information.
+    def notTaken: Prop = or(List(ff, th))
   }
 
   private def flattenAnd(p: Prop): List[SProp | Or] = p match {
@@ -64,6 +66,9 @@ object Occurrence {
     val props = props0.flatMap(flattenOr).distinct
     if (props.isEmpty) False
     else if (props.contains(True)) True
+    // an uninformative disjunct makes the whole disjunction uninformative:
+    // resolution keeps the unrefined env alive and joins back to it
+    else if (props.contains(Unknown)) Unknown
     else if (props.size == 1) props.head
     else Or(props)
   }
@@ -473,17 +478,18 @@ final class Occurrence(pipelineContext: PipelineContext) {
       .orElse(testObj(test2, aMap).map(cmpProps(_, test1, aMap)))
       .getOrElse((Unknown, Unknown))
 
-  // A test whose result can be anything and whose own evaluation may throw;
-  // `ev` carries whatever is known from its sub-evaluations.
+  // A test whose result can be anything and whose throw-cause is
+  // inexpressible; `ev` carries whatever is known from its sub-evaluations.
   private def opaque(ev: Prop): TP =
-    TP(ev, ev, ev, total = false, bool = false)
+    TP(ev, ev, ev, th = Unknown, bool = false)
 
   // A test that evaluates its components but can never be `true`
-  // (tuples, conses, map/record literals, numbers, ...).
+  // (tuples, conses, map/record literals, numbers, ...); it throws only if
+  // some component throws.
   private def neverTrue(args: List[Test], aMap: AMap): TP = {
     val tps = args.map(testProps(_, aMap))
     val ev = and(tps.map(_.ev))
-    TP(False, ev, ev, total = tps.forall(_.total), bool = false)
+    TP(False, ev, ev, th = or(tps.map(_.th)), bool = false)
   }
 
   private def objProp(test: Test, aMap: AMap, ty: Type): Prop =
@@ -510,28 +516,43 @@ final class Occurrence(pipelineContext: PipelineContext) {
   private def bff(test: Test, tp: TP, aMap: AMap): Prop =
     and(List(tp.ff, boolFact(test, tp, aMap)))
 
-  // A total type-test on `arg`: true iff `arg` has type `ty`, throws only if
+  // Throw-domain duals of objProp/boolFact: facts holding about `test`'s
+  // value when the enclosing operation threw because of it. Inexpressible
+  // for untrackable tests - Unknown, which absorbs the disjunction.
+  private def thNot(test: Test, aMap: AMap, ty: Type): Prop =
+    testObj(test, aMap).map(Neg(_, ty)).getOrElse(Unknown)
+
+  private def thIs(test: Test, aMap: AMap, ty: Type): Prop =
+    testObj(test, aMap).map(Pos(_, ty)).getOrElse(Unknown)
+
+  // "the result of `test` is not a boolean" as a throw-cause: impossible for
+  // structurally-boolean tests, a Neg for trackable ones, unknowable otherwise
+  private def thNotBool(test: Test, tp: TP, aMap: AMap): Prop =
+    if (tp.bool) False
+    else thNot(test, aMap, booleanType)
+
+  // A type-test on `arg`: true iff `arg` has type `ty`, throws only if
   // evaluating `arg` throws.
   private def typeTest(arg: Test, ty: Type, aMap: AMap): TP = {
     val tpArg = testProps(arg, aMap)
     val (pos, neg) = objProps(arg, aMap, ty)
-    TP(and(List(pos, tpArg.ev)), and(List(neg, tpArg.ev)), tpArg.ev, total = tpArg.total, bool = true)
+    TP(and(List(pos, tpArg.ev)), and(List(neg, tpArg.ev)), tpArg.ev, th = tpArg.th, bool = true)
   }
 
   private def testProps(test: Test, aMap: Map[Name, Obj]): TP = {
     test match {
       // literals evaluate to themselves and never throw
       case TestAtom("true") =>
-        TP(True, False, True, total = true, bool = true)
+        TP(True, False, True, th = False, bool = true)
       case TestAtom("false") =>
-        TP(False, True, True, total = true, bool = true)
+        TP(False, True, True, th = False, bool = true)
       case TestAtom(_) | TestInteger(_) | TestFloat() | TestString() | TestNil() | TestBinaryLit() |
           TestRecordIndex(_, _) =>
-        TP(False, True, True, total = true, bool = false)
+        TP(False, True, True, th = False, bool = false)
       case TestVar(v) =>
         // a bare variable test passes iff the variable is `true`
         val obj = aMap.getOrElse(v, VarObj(v))
-        TP(Pos(obj, trueType), Neg(obj, trueType), True, total = true, bool = false)
+        TP(Pos(obj, trueType), Neg(obj, trueType), True, th = False, bool = false)
       // structured literals: never `true`, their components are evaluated
       case TestTuple(elems) =>
         neverTrue(elems, aMap)
@@ -542,19 +563,22 @@ final class Occurrence(pipelineContext: PipelineContext) {
       case TestRecordCreate(_, fields) =>
         neverTrue(fields.map(_.value), aMap)
       case TestRecordSelect(rec, recName, _) =>
-        // selection throws unless `rec` is a #recName{}
+        // selection throws iff `rec` throws or is not a #recName{}
         val tpRec = testProps(rec, aMap)
-        val ev = and(List(tpRec.ev, objProp(rec, aMap, RecordType(recName)(module))))
+        val recTy = RecordType(recName)(module)
+        val ev = and(List(tpRec.ev, objProp(rec, aMap, recTy)))
+        val th = or(List(tpRec.th, thNot(rec, aMap, recTy)))
         val (pos, neg) = objProps(test, aMap, trueType)
-        TP(and(List(pos, ev)), and(List(neg, ev)), ev, total = false, bool = false)
+        TP(and(List(pos, ev)), and(List(neg, ev)), ev, th, bool = false)
       case TestNativeRecordSelect(rec, _, _) =>
         opaque(testProps(rec, aMap).ev)
       case TestMapUpdate(map, kvs) =>
-        // update throws unless `map` is a map
+        // update throws unless `map` is a map, but also on a missing key for
+        // `:=` associations (not distinguished in the AST) - th stays Unknown
         val tpMap = testProps(map, aMap)
         val kvTps = kvs.flatMap { case (k, v) => List(k, v) }.map(testProps(_, aMap))
         val ev = and(objProp(map, aMap, MapType(Map(), AnyType, AnyType)) :: tpMap.ev :: kvTps.map(_.ev))
-        TP(False, ev, ev, total = false, bool = false)
+        TP(False, ev, ev, th = Unknown, bool = false)
       case TestCall(Id(pred, 1), List(arg)) if unary_predicates.isDefinedAt(pred) =>
         typeTest(arg, unary_predicates(pred), aMap)
       case TestCall(Id("is_function", 2), List(arg, TestInteger(Some(arity)))) =>
@@ -563,13 +587,13 @@ final class Occurrence(pipelineContext: PipelineContext) {
         val tpArg = testProps(arg, aMap)
         val pos = testObj(arg, aMap).map(Pos(_, tPos)).getOrElse(True)
         val neg = testObj(arg, aMap).map(Neg(_, tNeg)).getOrElse(True)
-        TP(and(List(pos, tpArg.ev)), and(List(neg, tpArg.ev)), tpArg.ev, total = tpArg.total, bool = true)
+        TP(and(List(pos, tpArg.ev)), and(List(neg, tpArg.ev)), tpArg.ev, th = tpArg.th, bool = true)
       case TestCall(Id("is_function", 2), List(arg, _)) =>
         // non-literal arity: narrow to any fun; evaluation may throw on a bad
         // arity argument, and there is no precise negative
         val tpArg = testProps(arg, aMap)
         val pos = objProp(arg, aMap, AnyFunType)
-        TP(and(List(pos, tpArg.ev)), tpArg.ev, tpArg.ev, total = false, bool = true)
+        TP(and(List(pos, tpArg.ev)), tpArg.ev, tpArg.ev, th = Unknown, bool = true)
       case TestCall(Id("is_record", 3), List(arg, TestAtom(modName), TestAtom(recName))) =>
         typeTest(arg, nativeRecordTypeFor(modName, recName), aMap)
       case TestCall(Id("is_record", 2), List(arg, TestAtom(recName))) =>
@@ -577,7 +601,7 @@ final class Occurrence(pipelineContext: PipelineContext) {
       case TestCall(Id("is_record", 3), arg :: TestAtom(recName) :: rest) =>
         val base = typeTest(arg, RecordType(recName)(module), aMap)
         val litArity = rest.forall { case TestInteger(Some(_)) => true; case _ => false }
-        if (litArity) base else base.copy(total = false)
+        if (litArity) base else base.copy(th = Unknown)
       case TestCall(Id("is_map_key", 2), List(keyArg, mapArg)) =>
         val tpKey = testProps(keyArg, aMap)
         val tpMap = testProps(mapArg, aMap)
@@ -588,20 +612,30 @@ final class Occurrence(pipelineContext: PipelineContext) {
           case _ =>
             None
         }
+        val mapTy = MapType(Map(), AnyType, AnyType)
         // `is_map_key(K, M)` throws unless M is a map
-        val ev = and(List(tpKey.ev, tpMap.ev, objProp(mapArg, aMap, MapType(Map(), AnyType, AnyType))))
+        val ev = and(List(tpKey.ev, tpMap.ev, objProp(mapArg, aMap, mapTy)))
+        val th = mapArg match {
+          case _: TestMapCreate => or(List(tpKey.th, tpMap.th))
+          case _                => or(List(tpKey.th, tpMap.th, thNot(mapArg, aMap, mapTy)))
+        }
         // is_map_key(K, #{k1 => .., k2 => ....}) -> K :: k1 | k2 | ...
         val keyFact = mapKT.flatMap(keyTy => testObj(keyArg, aMap).map(Pos(_, keyTy))).getOrElse(True)
-        TP(and(List(keyFact, ev)), ev, ev, total = false, bool = true)
+        TP(and(List(keyFact, ev)), ev, ev, th, bool = true)
       case TestCall(Id("element", 2), List(idx, tup)) =>
-        // element/2 throws unless `idx` is an integer and `tup` a tuple
+        // element/2 throws unless `idx` is an integer and `tup` a tuple, but
+        // also on an out-of-range index - th stays Unknown
         val ev = and(List(evIn(idx, IntegerType, aMap), evIn(tup, AnyTupleType, aMap)))
         val (pos, neg) = objProps(test, aMap, trueType)
-        TP(and(List(pos, ev)), and(List(neg, ev)), ev, total = false, bool = false)
+        TP(and(List(pos, ev)), and(List(neg, ev)), ev, th = Unknown, bool = false)
       case TestCall(Id("hd" | "tl", 1), List(arg)) =>
-        val ev = evIn(arg, ListType(AnyType), aMap)
+        // throws iff `arg` throws, is not a list, or is []
+        val tpArg = testProps(arg, aMap)
+        val listTy = ListType(AnyType)
+        val ev = and(List(tpArg.ev, objProp(arg, aMap, listTy)))
+        val th = or(List(tpArg.th, thNot(arg, aMap, listTy), thIs(arg, aMap, NilType)))
         val (pos, neg) = objProps(test, aMap, trueType)
-        TP(and(List(pos, ev)), and(List(neg, ev)), ev, total = false, bool = false)
+        TP(and(List(pos, ev)), and(List(neg, ev)), ev, th, bool = false)
       case TestCall(_, args) =>
         // unknown guard BIF: outcome unknown, but its arguments were evaluated
         opaque(and(args.map(testProps(_, aMap).ev)))
@@ -609,13 +643,18 @@ final class Occurrence(pipelineContext: PipelineContext) {
         val tpArg = testProps(arg, aMap)
         val bf = boolFact(arg, tpArg, aMap)
         val ev = and(List(tpArg.ev, bf))
-        TP(and(List(tpArg.ff, bf)), and(List(tpArg.tt, bf)), ev, total = tpArg.total && tpArg.bool, bool = true)
+        val th = or(List(tpArg.th, thNotBool(arg, tpArg, aMap)))
+        TP(and(List(tpArg.ff, bf)), and(List(tpArg.tt, bf)), ev, th, bool = true)
       case TestUnOp("bnot", arg) =>
-        val ev = evIn(arg, IntegerType, aMap)
-        TP(False, ev, ev, total = false, bool = false)
+        val tpArg = testProps(arg, aMap)
+        val ev = and(List(tpArg.ev, objProp(arg, aMap, IntegerType)))
+        val th = or(List(tpArg.th, thNot(arg, aMap, IntegerType)))
+        TP(False, ev, ev, th, bool = false)
       case TestUnOp("+" | "-", arg) =>
-        val ev = evIn(arg, nType, aMap)
-        TP(False, ev, ev, total = false, bool = false)
+        val tpArg = testProps(arg, aMap)
+        val ev = and(List(tpArg.ev, objProp(arg, aMap, nType)))
+        val th = or(List(tpArg.th, thNot(arg, aMap, nType)))
+        TP(False, ev, ev, th, bool = false)
       case TestUnOp(_, arg) =>
         opaque(testProps(arg, aMap).ev)
       case TestBinOp("and", arg1, arg2) =>
@@ -624,21 +663,24 @@ final class Occurrence(pipelineContext: PipelineContext) {
         val ev = and(List(tp1.ev, boolFact(arg1, tp1, aMap), tp2.ev, boolFact(arg2, tp2, aMap)))
         val tt = and(List(tp1.tt, tp2.tt, ev))
         val ff = and(List(ev, or(List(tp1.ff, tp2.ff))))
-        TP(tt, ff, ev, total = tp1.total && tp2.total && tp1.bool && tp2.bool, bool = true)
+        val th = or(List(tp1.th, thNotBool(arg1, tp1, aMap), tp2.th, thNotBool(arg2, tp2, aMap)))
+        TP(tt, ff, ev, th, bool = true)
       case TestBinOp("or", arg1, arg2) =>
         val tp1 = testProps(arg1, aMap)
         val tp2 = testProps(arg2, aMap)
         val ev = and(List(tp1.ev, boolFact(arg1, tp1, aMap), tp2.ev, boolFact(arg2, tp2, aMap)))
         val tt = and(List(ev, or(List(tp1.tt, tp2.tt))))
         val ff = and(List(ev, tp1.ff, tp2.ff))
-        TP(tt, ff, ev, total = tp1.total && tp2.total && tp1.bool && tp2.bool, bool = true)
+        val th = or(List(tp1.th, thNotBool(arg1, tp1, aMap), tp2.th, thNotBool(arg2, tp2, aMap)))
+        TP(tt, ff, ev, th, bool = true)
       case TestBinOp("xor", arg1, arg2) =>
         val tp1 = testProps(arg1, aMap)
         val tp2 = testProps(arg2, aMap)
         val ev = and(List(tp1.ev, boolFact(arg1, tp1, aMap), tp2.ev, boolFact(arg2, tp2, aMap)))
         val tt = and(List(ev, or(List(and(List(tp1.tt, tp2.ff)), and(List(tp1.ff, tp2.tt))))))
         val ff = and(List(ev, or(List(and(List(tp1.tt, tp2.tt)), and(List(tp1.ff, tp2.ff))))))
-        TP(tt, ff, ev, total = tp1.total && tp2.total && tp1.bool && tp2.bool, bool = true)
+        val th = or(List(tp1.th, thNotBool(arg1, tp1, aMap), tp2.th, thNotBool(arg2, tp2, aMap)))
+        TP(tt, ff, ev, th, bool = true)
       case TestBinOp("andalso", arg1, arg2) =>
         val tp1 = testProps(arg1, aMap)
         val tp2 = testProps(arg2, aMap)
@@ -646,7 +688,8 @@ final class Occurrence(pipelineContext: PipelineContext) {
         val ev = and(List(tp1.ev, boolFact(arg1, tp1, aMap)))
         val tt = and(List(tp1.tt, tp2.tt, ev))
         val ff = and(List(ev, or(List(bff(arg1, tp1, aMap), and(List(tp1.tt, tp2.ff))))))
-        TP(tt, ff, ev, total = tp1.total && tp1.bool && tp2.total, bool = tp2.bool)
+        val th = or(List(tp1.th, thNotBool(arg1, tp1, aMap), and(List(tp1.tt, tp2.th))))
+        TP(tt, ff, ev, th, bool = tp2.bool)
       case TestBinOp("orelse", arg1, arg2) =>
         val tp1 = testProps(arg1, aMap)
         val tp2 = testProps(arg2, aMap)
@@ -654,31 +697,46 @@ final class Occurrence(pipelineContext: PipelineContext) {
         val ev = and(List(tp1.ev, boolFact(arg1, tp1, aMap)))
         val tt = and(List(ev, or(List(tp1.tt, and(List(bff(arg1, tp1, aMap), tp2.tt))))))
         val ff = and(List(ev, bff(arg1, tp1, aMap), tp2.ff))
-        TP(tt, ff, ev, total = tp1.total && tp1.bool && tp2.total, bool = tp2.bool)
-      case TestBinOp("+" | "-" | "*" | "/", arg1, arg2) =>
+        val th = or(List(tp1.th, thNotBool(arg1, tp1, aMap), and(List(bff(arg1, tp1, aMap), tp2.th))))
+        TP(tt, ff, ev, th, bool = tp2.bool)
+      case TestBinOp("+" | "-" | "*", arg1, arg2) =>
+        val tp1 = testProps(arg1, aMap)
+        val tp2 = testProps(arg2, aMap)
+        val ev = and(List(tp1.ev, objProp(arg1, aMap, nType), tp2.ev, objProp(arg2, aMap, nType)))
+        val th = or(List(tp1.th, thNot(arg1, aMap, nType), tp2.th, thNot(arg2, aMap, nType)))
+        TP(False, ev, ev, th, bool = false)
+      case TestBinOp("/", arg1, arg2) =>
+        // also throws on division by zero - th stays Unknown
         val ev = and(List(evIn(arg1, nType, aMap), evIn(arg2, nType, aMap)))
-        TP(False, ev, ev, total = false, bool = false)
-      case TestBinOp("div" | "rem" | "band" | "bor" | "bxor" | "bsl" | "bsr", arg1, arg2) =>
+        TP(False, ev, ev, th = Unknown, bool = false)
+      case TestBinOp("band" | "bor" | "bxor", arg1, arg2) =>
+        val tp1 = testProps(arg1, aMap)
+        val tp2 = testProps(arg2, aMap)
+        val ev = and(List(tp1.ev, objProp(arg1, aMap, IntegerType), tp2.ev, objProp(arg2, aMap, IntegerType)))
+        val th = or(List(tp1.th, thNot(arg1, aMap, IntegerType), tp2.th, thNot(arg2, aMap, IntegerType)))
+        TP(False, ev, ev, th, bool = false)
+      case TestBinOp("div" | "rem" | "bsl" | "bsr", arg1, arg2) =>
+        // also throw on a zero divisor / an absurd shift - th stays Unknown
         val ev = and(List(evIn(arg1, IntegerType, aMap), evIn(arg2, IntegerType, aMap)))
-        TP(False, ev, ev, total = false, bool = false)
+        TP(False, ev, ev, th = Unknown, bool = false)
       case TestBinOp("==" | "=:=", arg1, arg2) =>
         val tp1 = testProps(arg1, aMap)
         val tp2 = testProps(arg2, aMap)
         val (pos, neg) = eqProps(arg1, arg2, aMap)
         val ev = and(List(tp1.ev, tp2.ev))
-        TP(and(List(pos, ev)), and(List(neg, ev)), ev, total = tp1.total && tp2.total, bool = true)
+        TP(and(List(pos, ev)), and(List(neg, ev)), ev, th = or(List(tp1.th, tp2.th)), bool = true)
       case TestBinOp("=/=" | "/=", arg1, arg2) =>
         val tp1 = testProps(arg1, aMap)
         val tp2 = testProps(arg2, aMap)
         val (pos, neg) = eqProps(arg1, arg2, aMap)
         val ev = and(List(tp1.ev, tp2.ev))
-        TP(and(List(neg, ev)), and(List(pos, ev)), ev, total = tp1.total && tp2.total, bool = true)
+        TP(and(List(neg, ev)), and(List(pos, ev)), ev, th = or(List(tp1.th, tp2.th)), bool = true)
       case TestBinOp("<" | "=<" | ">" | ">=", arg1, arg2) =>
         // term ordering never throws, but the operands are still evaluated
         val tp1 = testProps(arg1, aMap)
         val tp2 = testProps(arg2, aMap)
         val ev = and(List(tp1.ev, tp2.ev))
-        TP(ev, ev, ev, total = tp1.total && tp2.total, bool = true)
+        TP(ev, ev, ev, th = or(List(tp1.th, tp2.th)), bool = true)
       case TestBinOp(_, arg1, arg2) =>
         opaque(and(List(testProps(arg1, aMap).ev, testProps(arg2, aMap).ev)))
     }
